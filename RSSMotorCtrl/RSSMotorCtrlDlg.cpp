@@ -65,6 +65,8 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_STN_CLICKED(IDC_STATIC_Ramp_UpperPos, &CRSSMotorCtrlDlg::OnStnClickedStaticRampUpperpos)
+	ON_BN_CLICKED(IDC_BUTTON_Ramp_Send, &CRSSMotorCtrlDlg::OnBnClickedButtonRampSend)
 END_MESSAGE_MAP()
 
 
@@ -153,3 +155,10 @@ HCURSOR CRSSMotorCtrlDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
+{
+	// TODO: Add your control notification handler code here
+	
+	//SEND button in RAMP POSITION CONTROL
+}
