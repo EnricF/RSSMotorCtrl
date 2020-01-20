@@ -7,9 +7,20 @@
 #include "RSSMotorCtrl.h"
 #include "RSSMotorCtrlDlg.h"
 
+//EF mod
+#include "globalVar.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+
+/* Prevent MS VC8 compiler and later warnings about deprecated CRT function */
+#if (_MSC_VER >= 1400)
+# define _CRT_SECURE_NO_DEPRECATE
+# define _CRT_SECURE_NO_WARNINGS
+#endif
+
 
 
 // CRSSMotorCtrlApp

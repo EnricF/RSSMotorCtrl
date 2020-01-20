@@ -8,13 +8,22 @@
 #include "RSSMotorCtrlDlg.h"
 #include "afxdialogex.h"
 
+//EF mod
+#include "globalVar.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
+/* Prevent MS VC8 compiler and later warnings about deprecated CRT function */
+#if (_MSC_VER >= 1400)
+# define _CRT_SECURE_NO_DEPRECATE
+# define _CRT_SECURE_NO_WARNINGS
+#endif
+
 //EF mod: use only to pass compilation while code editing
 #ifndef CV_PI
-#define CV_PI 3.1415
+#define CV_PI 3.14159265359
 #endif
 
 
@@ -279,6 +288,10 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 
 	//Zeros Calibration
 	//InitZerosCalibration();
+
+
+	//Create an ECM thread? Not decided yet, but valid for testing purposes.
+
 
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
