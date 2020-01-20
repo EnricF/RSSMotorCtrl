@@ -130,6 +130,34 @@ UINT ThreadInterface(LPVOID pParam)
 	return 0;
 }
 
+UINT ThreadECMWorker(LPVOID pParam) {
+	__int64 initial, final;
+
+	CRSSMotorCtrlDlg* pObject = (CRSSMotorCtrlDlg*)pParam;
+
+	pObject->bThreadECMWActive = true;
+
+	//Init ECM and loop until end
+	pObject->cecmTest.Init(__argc, __argv);
+			
+	WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for EMC thread to finish
+
+	pObject->bThreadWActive = false;
+	//Control bucle
+	while (pObject->bThreadWActive)
+	{
+		//TODO
+
+	}
+	//Finish Thread
+	pObject->bThreadWFinished = true;
+
+	return 0;//OK
+}
+
+
+
+
 //Control thread
 UINT ThreadWorker(LPVOID pParam)
 {
@@ -274,11 +302,17 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 
+	//Init EtherCAT communication
+	//cecmslave.Init();
+	//cecmslave.Init(__argc, __argv);
+	//cCan2ESD.Init(0, 0);
+
+
 	//Init Device Data
 	//InitDevData();
 
 	//Init Threads
-	InitControlThreads();
+	InitControlThreads();//EF mod : new thread to Init() EtherCAT communication
 
 	//Init calibration correction 
 	//InitCalibPosition();
@@ -288,12 +322,9 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 
 	//Zeros Calibration
 	//InitZerosCalibration();
-
-
+	
 	//Create an ECM thread? Not decided yet, but valid for testing purposes.
-
-
-
+	   
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -357,11 +388,15 @@ void CRSSMotorCtrlDlg::InitControlThreads()
 	QueryPerformanceFrequency((LARGE_INTEGER*)&iFrequency);
 
 	//Init Control Variables
-	bThreadWFinished = false;
-	bThreadRIFinished = false;
-	dWorkerTPC = THREAD_TPC;
-	dSecWorkerTPC = THREAD_TPC;
+	bThreadWFinished	= false;
+	bThreadECMWFinished = false;
+	bThreadRIFinished	= false;
+	dWorkerTPC			= THREAD_TPC;
+	dSecWorkerTPC		= THREAD_TPC;
 
+
+	//Create and run ECM thread
+	tECMWorker = AfxBeginThread(ThreadECMWorker, this, THREAD_PRIORITY_TIME_CRITICAL+1);
 	//Create and run control thread
 	tWorker = AfxBeginThread(ThreadWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
 
@@ -389,15 +424,27 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);		fLoopMaxVel		= (float)(atof(szText)*CV_PI / 180.f);
 	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);		fLoopMaxAcc		= (float)(atof(szText)*CV_PI / 180.f);
 
-	bSendRamp = true;
+	if (fLoopTargetPos <= 1.0)
+		fLoopTargetPos = 100.0;//default initial position
+	if (fLoopMaxVel <= 0.1)
+		fLoopMaxVel = 1.0;//default max velocity 
+	if (fLoopMaxAcc <= 0.1)
+		fLoopMaxAcc = 1.0;//default acceleration value
+	
+	bSendRamp	= true;
 
-	motionMode = DEV_M_POS;
+	motionMode	= DEV_M_POS;
+
+	//cecmTest.writePDRampSend(fLoopTargetPos);//Writes selected values to execute a Ramp Motion
+
 }
 
 
 void CRSSMotorCtrlDlg::ExecuteRampMotionControl()
 {
 	double moduleAIPos = 0;
+
+	bool isFinished = false;
 
 	//Update values
 	//UpdateLoopValues();
@@ -421,20 +468,26 @@ void CRSSMotorCtrlDlg::ExecuteRampMotionControl()
 	//Normal Mode
 	else if (bSendRamp)
 	{
-		/*if (bTrajectoryRunning)
+		bool bTrajectoryRunning = false;
+		if (bTrajectoryRunning)
 		{
-			cCanESD.SetTargetVel(iCanId, (float)dTrajectoryVel);
+			/*cCanESD.SetTargetVel(iCanId, (float)dTrajectoryVel);
 			cCanESD.SetTargetAcc(iCanId, (float)dTrajectoryAcc);
-			cCanESD.MotionFRampMode(iCanId, (float)dTrajectoryPos);
+			cCanESD.MotionFRampMode(iCanId, (float)dTrajectoryPos);*/			
+			isFinished = true;
 		}
 		else
 		{
-			cCanESD.SetTargetVel(iCanId, fLoopMaxVel);
+			//old
+			/*cCanESD.SetTargetVel(iCanId, fLoopMaxVel);
 			cCanESD.SetTargetAcc(iCanId, fLoopMaxAcc);
-			cCanESD.MotionFRampMode(iCanId, fLoopTargetPos);
-		}*/
+			cCanESD.MotionFRampMode(iCanId, fLoopTargetPos);*/
+		
+			isFinished = cecmTest.MotionFRampMode(fLoopTargetPos);//single drive condition
+		}
 
-		bSendRamp = false;
+		if(isFinished == true)
+			bSendRamp = false;
 	}
 }
 

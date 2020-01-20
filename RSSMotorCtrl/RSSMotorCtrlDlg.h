@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "ecmTest.h" //Add class header
+
 
 // CRSSMotorCtrlDlg dialog
 class CRSSMotorCtrlDlg : public CDialogEx
@@ -15,7 +17,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//									CONTROL THREADS									//
 		//////////////////////////////////////////////////////////////////////////////////////
 
-			//Definitions
+		//Definitions
 		#define						THREAD_TPC 5
 		#define						TIMER_EXIT 0
 
@@ -35,6 +37,12 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		CWinThread *				tSecWorker;
 		double						dSecWorkerTPC;
 
+		//ECM
+		bool						bThreadECMWActive;
+		bool						bThreadECMWFinished;
+		CWinThread *				tECMWorker;
+		double						dECMWorkerTPC;
+
 		//Interface
 		bool						bThreadRIActive;
 		bool						bThreadRIFinished;
@@ -46,10 +54,16 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						FinalizeControlThreads();
 
 		//////////////////////////////////////////////////////////////////////////////////
+		//									ETHERCAT SLAVE OBJECTS						//
+		//////////////////////////////////////////////////////////////////////////////////
+
+		CecmTest					cecmTest;//EtherCAT slave
+
+		//////////////////////////////////////////////////////////////////////////////////
 		//									DEVICE DATA									//
 		//////////////////////////////////////////////////////////////////////////////////
 
-			//Definitions
+		//Definitions
 		#define						DEV_FIELDS		5								//Device Control Fields
 		#define						DEV_ACT			0								//Actual paramater value
 		#define						DEV_TARGET		1								//Target parameter value

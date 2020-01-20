@@ -313,6 +313,7 @@
 # define rewind(fp)  fseek(fp, 0L, SEEK_SET)
 #endif
 
+
 /*********************************************************************/
 /*                            ENUMS                                  */
 /*********************************************************************/
@@ -506,6 +507,12 @@ static uint8_t *pucDio_TargetVelocity	= NULL;//EF mod, "Target velocity" pointer
 static int ecmTestInit(ECM_LIB_INIT *pLibInit);
 static int ecmTestCleanup(void);
 
+
+//Temporally global, to be moved inside its class
+//FILE log
+FILE * ECMlogFile;
+const char * cECMlogFile = "logFile.txt";
+
 /*
  * Print usage information
  */
@@ -626,7 +633,7 @@ static int ParseCommandLine(int argc, char *argv[])
             if (pszBuffer != NULL) {
                 iPrimaryNic = strtoul(pszBuffer, &pEnd, 0);
                 if(*pEnd != '\0') {
-                    printf("Invalid parameter >%s< for option '%c'\n", pEnd, c);
+                    fprintf(ECMlogFile,"Invalid parameter >%s< for option '%c'\n", pEnd, c);
                     return -1;
                 }
             }
@@ -634,7 +641,7 @@ static int ParseCommandLine(int argc, char *argv[])
             if (pszBuffer != NULL) {
                 iRedundantNic = strtoul(pszBuffer, &pEnd, 0);
                 if(*pEnd != '\0') {
-                    printf("Invalid parameter >%s< for option '%c'\n", pEnd, c);
+                    fprintf(ECMlogFile,"Invalid parameter >%s< for option '%c'\n", pEnd, c);
                     return -1;
                 }
             }
@@ -642,7 +649,7 @@ static int ParseCommandLine(int argc, char *argv[])
         case 'c':
             g_ulCycleTime = (uint32_t)strtoul(optarg, &pEnd, 0);
             if(*pEnd != '\0') {
-                printf("Invalid parameter >%s< for option '%c'\n", pEnd, c);
+                fprintf(ECMlogFile,"Invalid parameter >%s< for option '%c'\n", pEnd, c);
                 return -1;
             }
             break;
@@ -652,14 +659,14 @@ static int ParseCommandLine(int argc, char *argv[])
         case 'e':
             g_ulEventMask = strtoul(optarg, &pEnd, 16);
             if (*pEnd != '\0') {
-                printf("Invalid parameter %s for option '%c'\n", pEnd, c);
+                fprintf(ECMlogFile,"Invalid parameter %s for option '%c'\n", pEnd, c);
                 g_ulEventMask = ECM_TEST_EVENT_MASK;
             }
             break;
         case 'i':
             g_ulIoMode = (uint32_t)atoi(optarg);
             if (g_ulIoMode > 7) {
-                printf("Invalid parameter %lx for I/O mode\n", (unsigned long)g_ulIoMode);
+                fprintf(ECMlogFile,"Invalid parameter %lx for I/O mode\n", (unsigned long)g_ulIoMode);
                 g_ulIoMode = 0;
             }
             break;
@@ -695,12 +702,12 @@ static int ParseCommandLine(int argc, char *argv[])
             if (*optarg != '\0') {
                 g_ulDebugMask = strtoul(optarg, &pszBuffer, 16);
                 if (*pszBuffer != '\0') {
-                    printf("Invalid character %c in debug mask argument '%s' !\n",
+                    fprintf(ECMlogFile,"Invalid character %c in debug mask argument '%s' !\n",
                         *pszBuffer, optarg);
                     g_ulDebugMask = 0xC0000000;
                 } else if ((errno != 0) &&
                     ((0 == g_ulDebugMask) || (ULONG_MAX == g_ulDebugMask))) {
-                        printf("Invalid parameter in debug mask argument '%s' !\n",
+                        fprintf(ECMlogFile,"Invalid parameter in debug mask argument '%s' !\n",
                             optarg);
                         g_ulDebugMask = 0xC0000000;
                 }
@@ -709,11 +716,11 @@ static int ParseCommandLine(int argc, char *argv[])
         case OPT_DST_ADDR:
             if (optarg != NULL) {
                 if (ParseHwAddr(optarg, &g_DstMac) != 0) {
-                    printf("Invalid hwaddr '%s' for primary adapter !\n", optarg);
+                    fprintf(ECMlogFile,"Invalid hwaddr '%s' for primary adapter !\n", optarg);
                 }
                 ulConfigFlags |= ECM_TEST_FLAG_FORCE_DST_ADDR;
             } else {
-                printf("Enabling no broadcast\n");
+                fprintf(ECMlogFile,"Enabling no broadcast\n");
                 ulConfigFlags |= ECM_TEST_FLAG_NO_BROADCAST;
             }
             break;
@@ -727,7 +734,7 @@ static int ParseCommandLine(int argc, char *argv[])
                     ulConfigFlags |= ECM_TEST_FLAG_PRINT_ESI;
                 } else {
                     if (strcmp(optarg, "hex") != 0) {
-                        printf("Ignoring option '%s' dumping EEPROM data !\n",
+                        fprintf(ECMlogFile,"Ignoring option '%s' dumping EEPROM data !\n",
                                 optarg);
                     }
                 }
@@ -745,12 +752,12 @@ static int ParseCommandLine(int argc, char *argv[])
             if (optarg != NULL) {
                 g_ulProfileMask = strtoul(optarg, &pszBuffer, 16);
                 if (*pszBuffer != '\0') {
-                    printf("Invalid character %c in profiling mask argument '%s' !\n",
+                    fprintf(ECMlogFile,"Invalid character %c in profiling mask argument '%s' !\n",
                            *pszBuffer, optarg);
                     g_ulProfileMask = 0;
                 } else if ((errno != 0) &&
                     ((0 == g_ulProfileMask) || (ULONG_MAX == g_ulProfileMask))) {
-                        printf("Invalid parameter in profiling mask argument '%s' !\n",
+                        fprintf(ECMlogFile,"Invalid parameter in profiling mask argument '%s' !\n",
                             optarg);
                         g_ulProfileMask = 0;
                 }
@@ -859,16 +866,16 @@ static int hexDump(uint8_t *pBuffer, uint16_t usDataSize, uint16_t usBase)
     int i, j;
 
     for (i = 0; i < usDataSize; i += 4) {
-        printf("%04x:",  usBase + i);
+        fprintf(ECMlogFile,"%04x:",  usBase + i);
         for (j = 0; j < 8; j++) {
-            printf(" %02x", *(pBuffer + i*2 + j));
+            fprintf(ECMlogFile," %02x", *(pBuffer + i*2 + j));
         }
         printf (" |");
         for (j = 0; j < 8; j++) {
             uint8_t ch = *(pBuffer + i*2 + j);
-            printf(" %c", isprint(ch) ? ch : '.');
+            fprintf(ECMlogFile," %c", isprint(ch) ? ch : '.');
         }
-        printf("\n");
+        fprintf(ECMlogFile,"\n");
     }
 
     return(0);
@@ -886,7 +893,7 @@ static int ReadConfigFileIntoMemory(const char *pszConfigFile, void **ppBuffer,
     /* Try open the master configuration file */
     fp = fopen(pszConfigFile, "rb");
     if (NULL == fp) {
-        printf("Could not open input file '%s'!\n", pszConfigFile);
+        fprintf(ECMlogFile,"Could not open input file '%s'!\n", pszConfigFile);
         return(-1);
     }
 
@@ -896,7 +903,7 @@ static int ReadConfigFileIntoMemory(const char *pszConfigFile, void **ppBuffer,
     state = fseek(fp, 0, SEEK_END);
     if (state != 0) {
         fclose(fp);
-        printf("Error getting file size of '%s'\n", pszConfigFile);
+        fprintf(ECMlogFile,"Error getting file size of '%s'\n", pszConfigFile);
         return(-1);
     }
 
@@ -906,7 +913,7 @@ static int ReadConfigFileIntoMemory(const char *pszConfigFile, void **ppBuffer,
     *ppBuffer = calloc(1, *pSize);
     if (NULL == *ppBuffer) {
         fclose(fp);
-        printf("Error allocating memory for file '%s'\n", pszConfigFile);
+        fprintf(ECMlogFile,"Error allocating memory for file '%s'\n", pszConfigFile);
         return(-1);
     }
 
@@ -983,7 +990,7 @@ static int CycleStartHandler(ECM_HANDLE hndDevice, int error)
                     (void)ecmTraceEvent(ECM_TEST_TRACE_ID, iCycleCount,
                                        (int32_t)(ulMax));
                     if(0 == (ulConfigFlags & ECM_TEST_FLAG_SILENT)) {
-                        printf("Jitter (%d) %d us\n", iCycleCount, ulMax);
+                        fprintf(ECMlogFile,"Jitter (%d) %d us\n", iCycleCount, ulMax);
                     }
                 }
             }
@@ -1023,16 +1030,9 @@ static int CycleHandler(ECM_HANDLE hndDevice, int error)
      */
     CycleHandlerErrorMessage(error, ECM_TEST_CYCLIC_HANDLER);
 
-	//EF mod
-    /* Set output data */
-    /*if (0 == ucData) {
-        ucData = 1;
-        } else {
-        ucData = ucData << 1;//EF comment, here is where the OUTPUT data is written!!!
-        }*/
-	
+
 	//EF mod: Just another value in output data!
-	if ( cycleCounter < 500 ) {
+	if (cycleCounter < 500) {
 
 		if (!faul_reset_is_done) {
 			ucData = 128;//128: Fault reset
@@ -1049,23 +1049,23 @@ static int CycleHandler(ECM_HANDLE hndDevice, int error)
 			}
 		}
 		else {
-			ucData	= 0;//0: default
+			ucData = 0;//0: default
 		}
 	}
-	else if ( cycleCounter < 600 ) {
+	else if (cycleCounter < 600) {
 		ucData = 6; //6: Shutdown 
 	}
 
-	else if ( cycleCounter < 700 ) {
+	else if (cycleCounter < 700) {
 		ucData = 7; //7: Switch on
 	}
-	else if ( cycleCounter < 720 ) {
+	else if (cycleCounter < 720) {
 		ucData = 15;//15: Switch on
 		//ucData_TargetPosition = 200;
 		if (*pucDio_TargetPosition == 0) {
 			//*pucDio_TargetPosition++ = ucData_TargetPosition;
-			*pucDio_TargetPosition		= 0xD0;//LSB
-			*(pucDio_TargetPosition + 1)= 0x07;//MSB
+			*pucDio_TargetPosition = 0xD0;//LSB
+			*(pucDio_TargetPosition + 1) = 0x07;//MSB
 		}
 	}
 	else {
@@ -1075,10 +1075,9 @@ static int CycleHandler(ECM_HANDLE hndDevice, int error)
 		}*/
 	}
 	cycleCounter++;
-
 	//----------------------------
 
-    /* Update output data in process image */
+    // Update CONTROL WORD data in process image */
     if (pucDio != 0) {
         *pucDio = ucData;//Controlword!
     }
@@ -1132,53 +1131,53 @@ static int PrintEsiInformation(char *buffer, uint32_t ulSzBuffer)
 
     result = ecmGetEsiCategoryList(buffer, ulSzBuffer, header, &usEntries);
     if ((result != ECM_SUCCESS) && (result != ECM_E_NOT_FOUND)) {
-        printf("ecmGetEsiCategoryList() failed with %s\n", ecmResultToString(result));
+        fprintf(ECMlogFile,"ecmGetEsiCategoryList() failed with %s\n", ecmResultToString(result));
         return(result);
     }
 
-    printf(" Index | Size | Categotry type\n");
-    printf("-------+------+--------------------\n");
+    fprintf(ECMlogFile," Index | Size | Categotry type\n");
+    fprintf(ECMlogFile,"-------+------+--------------------\n");
     for (j = 0; j < usEntries; j++) {
-        printf(" %04x  | %04x | ", header[j].usCategoryType,
+        fprintf(ECMlogFile," %04x  | %04x | ", header[j].usCategoryType,
             header[j].usCategorySize);
         switch(header[j].usCategoryType) {
         case ECM_ESI_CATEGORY_TYPE_NOP:
-            printf("No info\n");
+            fprintf(ECMlogFile,"No info\n");
             break;
         case ECM_ESI_CATEGORY_TYPE_STRING:
-            printf("String repository");
+            fprintf(ECMlogFile,"String repository");
             break;
         case ECM_ESI_CATEGORY_TYPE_DATA_TYPE:
-            printf("Data types");
+            fprintf(ECMlogFile,"Data types");
             break;
         case ECM_ESI_CATEGORY_TYPE_GENERAL:
-            printf("General information");
+            fprintf(ECMlogFile,"General information");
             break;
         case ECM_ESI_CATEGORY_TYPE_FMMU:
-            printf("FMMUs");
+            fprintf(ECMlogFile,"FMMUs");
             break;
         case ECM_ESI_CATEGORY_TYPE_SYNCMAN:
-            printf("Sync Manager");
+            fprintf(ECMlogFile,"Sync Manager");
             break;
         case ECM_ESI_CATEGORY_TYPE_TXPDO:
-            printf("TxPDO description");
+            fprintf(ECMlogFile,"TxPDO description");
             break;
         case ECM_ESI_CATEGORY_TYPE_RXPDO:
-            printf("TxPDO description");
+            fprintf(ECMlogFile,"TxPDO description");
             break;
         case ECM_ESI_CATEGORY_TYPE_DC:
-            printf("Distributed Clock");
+            fprintf(ECMlogFile,"Distributed Clock");
             break;
         default:
-            printf("Unknown");
+            fprintf(ECMlogFile,"Unknown");
             if (header[j].usCategoryType & ECM_ESI_VENDOR_SPECIFIC) {
-                printf(" (Vendor specific)");
+                fprintf(ECMlogFile," (Vendor specific)");
             }
         }
-        printf("\n");
+        fprintf(ECMlogFile,"\n");
     }
 
-    printf("-------+------+--------------------\n");
+    fprintf(ECMlogFile,"-------+------+--------------------\n");
 
     /* Dump general category */
     result = ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_GENERAL,
@@ -1186,16 +1185,16 @@ static int PrintEsiInformation(char *buffer, uint32_t ulSzBuffer)
     if (ECM_SUCCESS == result) {
         ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_STRING,
             cat1.general.ucGroupIdx, &cat2);
-        printf("Group Information : %s\n", cat2.cString);
+        fprintf(ECMlogFile,"Group Information : %s\n", cat2.cString);
         ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_STRING,
             cat1.general.ucImgIdx, &cat2);
-        printf("Image Name        : %s\n", cat2.cString);
+        fprintf(ECMlogFile,"Image Name        : %s\n", cat2.cString);
         ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_STRING,
             cat1.general.ucOrderIdx, &cat2);
-        printf("Order Number      : %s\n", cat2.cString);
+        fprintf(ECMlogFile,"Order Number      : %s\n", cat2.cString);
         ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_STRING,
             cat1.general.ucNameIdx, &cat2);
-        printf("Device Name       : %s\n", cat2.cString);
+        fprintf(ECMlogFile,"Device Name       : %s\n", cat2.cString);
     }
 
     /* Dump FMMU category */
@@ -1205,17 +1204,17 @@ static int PrintEsiInformation(char *buffer, uint32_t ulSzBuffer)
         if (result != ECM_SUCCESS) {
             break;
         }
-        printf("FMMU%d\n", usIdx);
-        printf(" Usage            : ");
+        fprintf(ECMlogFile,"FMMU%d\n", usIdx);
+        fprintf(ECMlogFile," Usage            : ");
         switch(cat1.fmmu) {
             case ECM_ESI_FMMU_TYPE_NONE:
             case ECM_ESI_FMMU_TYPE_UNUSED:
-                printf("Unused\n");
+                fprintf(ECMlogFile,"Unused\n");
                 break;
-            case ECM_ESI_FMMU_TYPE_INPUTS : printf("Inputs\n"); break;
-            case ECM_ESI_FMMU_TYPE_OUTPUTS: printf("Outputs\n"); break;
-            case ECM_ESI_FMMU_TYPE_MBOXSTATE: printf("MBox state\n"); break;
-            default: printf("Invalid\n"); break;
+            case ECM_ESI_FMMU_TYPE_INPUTS : fprintf(ECMlogFile,"Inputs\n"); break;
+            case ECM_ESI_FMMU_TYPE_OUTPUTS: fprintf(ECMlogFile,"Outputs\n"); break;
+            case ECM_ESI_FMMU_TYPE_MBOXSTATE: fprintf(ECMlogFile,"MBox state\n"); break;
+            default: fprintf(ECMlogFile,"Invalid\n"); break;
         }
     }
 
@@ -1226,34 +1225,34 @@ static int PrintEsiInformation(char *buffer, uint32_t ulSzBuffer)
         if (result != ECM_SUCCESS) {
             break;
         }
-        printf("SM%d\n", usIdx);
-        printf(" Physical Start   : %0#4x\n", cat1.sm.usPhysStartAddr);
-        printf(" Length           : %0#4x\n", cat1.sm.usLength);
-        printf(" Ctrl Register    : %0#2x\n", cat1.sm.ucControlReg);
-        printf(" Enable           : ");
+        fprintf(ECMlogFile,"SM%d\n", usIdx);
+        fprintf(ECMlogFile," Physical Start   : %0#4x\n", cat1.sm.usPhysStartAddr);
+        fprintf(ECMlogFile," Length           : %0#4x\n", cat1.sm.usLength);
+        fprintf(ECMlogFile," Ctrl Register    : %0#2x\n", cat1.sm.ucControlReg);
+        fprintf(ECMlogFile," Enable           : ");
         if (cat1.sm.ucEnable & ECM_ESI_SM_FLAG_ENABLE) {
-            printf("Yes");
+            fprintf(ECMlogFile,"Yes");
         } else {
-            printf("No");
+            fprintf(ECMlogFile,"No");
         }
         if (cat1.sm.ucEnable & ECM_ESI_SM_FLAG_FIXED) {
-            printf(" Fixed");
+            fprintf(ECMlogFile," Fixed");
         }
         if (cat1.sm.ucEnable & ECM_ESI_SM_FLAG_VIRTUAL) {
-            printf(" Virtual");
+            fprintf(ECMlogFile," Virtual");
         }
         if (cat1.sm.ucEnable & ECM_ESI_SM_FLAG_OP_ONLY) {
-            printf(" OpOnly");
+            fprintf(ECMlogFile," OpOnly");
         }
-        printf("\n");
-        printf(" Usage            : ");
+        fprintf(ECMlogFile,"\n");
+        fprintf(ECMlogFile," Usage            : ");
         switch(cat1.sm.ucType) {
-            case ECM_ESI_SM_TYPE_UNUSED: printf("Unused\n"); break;
-            case ECM_ESI_SM_TYPE_MBOX_OUT : printf("MBox out\n"); break;
-            case ECM_ESI_SM_TYPE_MBOX_IN : printf("MBox in\n"); break;
-            case ECM_ESI_SM_TYPE_DATA_OUT : printf("Process data out\n"); break;
-            case ECM_ESI_SM_TYPE_DATA_IN : printf("Process data in\n"); break;
-            default: printf("Invalid\n"); break;
+            case ECM_ESI_SM_TYPE_UNUSED: fprintf(ECMlogFile,"Unused\n"); break;
+            case ECM_ESI_SM_TYPE_MBOX_OUT : fprintf(ECMlogFile,"MBox out\n"); break;
+            case ECM_ESI_SM_TYPE_MBOX_IN : fprintf(ECMlogFile,"MBox in\n"); break;
+            case ECM_ESI_SM_TYPE_DATA_OUT : fprintf(ECMlogFile,"Process data out\n"); break;
+            case ECM_ESI_SM_TYPE_DATA_IN : fprintf(ECMlogFile,"Process data in\n"); break;
+            default: fprintf(ECMlogFile,"Invalid\n"); break;
         }
     }
 
@@ -1264,21 +1263,21 @@ static int PrintEsiInformation(char *buffer, uint32_t ulSzBuffer)
         if (result != ECM_SUCCESS) {
             break;
         }
-        printf("RxPDO%d\n", usIdx);
-        printf(" Index   : %0#4x\n", cat1.pdo.usIndex);
+        fprintf(ECMlogFile,"RxPDO%d\n", usIdx);
+        fprintf(ECMlogFile," Index   : %0#4x\n", cat1.pdo.usIndex);
         ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_STRING,
             cat1.pdo.ucNameIdx, &cat2);
-        printf(" Name    : %s\n", cat2.cString);
-        printf(" SyncMan : %0#2x\n", cat1.pdo.ucSM);
-        printf(" DC Sync : %0#2x\n", cat1.pdo.ucDcSync);
+        fprintf(ECMlogFile," Name    : %s\n", cat2.cString);
+        fprintf(ECMlogFile," SyncMan : %0#2x\n", cat1.pdo.ucSM);
+        fprintf(ECMlogFile," DC Sync : %0#2x\n", cat1.pdo.ucDcSync);
         for (j = 0; j < cat1.pdo.ucNumEntries; j++) {
-            printf(" Object_%d\n", j);
-            printf("  Index    : %0#4x\n", cat1.pdo.entry[j].usIndex);
-            printf("  Subindex : %0#2x\n", cat1.pdo.entry[j].ucSubIndex);
+            fprintf(ECMlogFile," Object_%d\n", j);
+            fprintf(ECMlogFile,"  Index    : %0#4x\n", cat1.pdo.entry[j].usIndex);
+            fprintf(ECMlogFile,"  Subindex : %0#2x\n", cat1.pdo.entry[j].ucSubIndex);
             ecmGetEsiCategory(buffer, ulSzBuffer, ECM_ESI_CATEGORY_TYPE_STRING,
                 cat1.pdo.entry[j].ucNameIdx, &cat2);
-            printf("  Name     : %s\n", cat2.cString);
-            printf("  Bitlen   : %0#2x\n", cat1.pdo.entry[j].ucBitLen);
+            fprintf(ECMlogFile,"  Name     : %s\n", cat2.cString);
+            fprintf(ECMlogFile,"  Bitlen   : %0#2x\n", cat1.pdo.entry[j].ucBitLen);
         }
     }
 
@@ -1307,13 +1306,13 @@ static int PrintEscRegister(ECM_HANDLE hndMaster)
 
     /* Blocking operation not possible without cyclic worker task */
     if ((g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER) != 0) {
-      printf("Blocking ESC access not supported without cyclic worker !\n");
+      fprintf(ECMlogFile,"Blocking ESC access not supported without cyclic worker !\n");
       return(-1);
     }
 
     /* Get number of slaves */
     ECM_GET_SLAVE_COUNT(hndMaster, &usCount, &result);
-    printf("Found %d active slaves\n", usCount);
+    fprintf(ECMlogFile,"Found %d active slaves\n", usCount);
 
     /* Iterate for all slaves */
     while(usCount-- != 0) {
@@ -1322,79 +1321,79 @@ static int PrintEscRegister(ECM_HANDLE hndMaster)
         ECM_INIT(EscInfo);
         ECM_GET_ESC_INFO(hndMaster, iAddr, &EscInfo, &result);
         if (ECM_SUCCESS == result) {
-            printf("ESC Info:\n");
-            printf("---------\n");
-            printf("Type             : ");
+            fprintf(ECMlogFile,"ESC Info:\n");
+            fprintf(ECMlogFile,"---------\n");
+            fprintf(ECMlogFile,"Type             : ");
             switch(EscInfo.ucType) {
                 case ECM_ESC_TYPE_BKHF_TERMINAL_1:
-                    printf("Beckhoff first terminals\n");
+                    fprintf(ECMlogFile,"Beckhoff first terminals\n");
                     break;
                 case ECM_ESC_TYPE_ESC20:
-                    printf("Beckhoff ESC 10 or ESC 20\n");
+                    fprintf(ECMlogFile,"Beckhoff ESC 10 or ESC 20\n");
                     break;
                 case ECM_ESC_TYPE_EK1100:
-                    printf("Beckhoff EK1100-\n");
+                    fprintf(ECMlogFile,"Beckhoff EK1100-\n");
                     break;
                 case ECM_ESC_TYPE_IP_CORE:
-                    printf("Beckhoff IP Core\n");
+                    fprintf(ECMlogFile,"Beckhoff IP Core\n");
                     break;
                 case ECM_ESC_TYPE_BKHF_TERMINAL_2:
-                    printf("Beckhoff current terminals\n");
+                    fprintf(ECMlogFile,"Beckhoff current terminals\n");
                     break;
                 case ECM_ESC_TYPE_ET1100:
-                    printf("Beckhoff ET1100");
+                    fprintf(ECMlogFile,"Beckhoff ET1100");
                     if (0 == EscInfo.usBuild) {
-                        printf("0001\n");
+                        fprintf(ECMlogFile,"0001\n");
                     } else {
-                        printf("%04d\n", EscInfo.usBuild);
+                        fprintf(ECMlogFile,"%04d\n", EscInfo.usBuild);
                     }
                     break;
                 case ECM_ESC_TYPE_ET1200:
-                    printf("Beckhoff ET1200\n");
+                    fprintf(ECMlogFile,"Beckhoff ET1200\n");
                     break;
                 default:
-                    printf("Unknown ESC type %02x\n", EscInfo.ucType);
+                    fprintf(ECMlogFile,"Unknown ESC type %02x\n", EscInfo.ucType);
                     break;
             }
-            printf("Version          : %d.%d\n", EscInfo.ucRevision, EscInfo.usBuild);
-            printf("#FMMUs           : %d\n", EscInfo.ucNumFMMU);
-            printf("#SM              : %d\n", EscInfo.ucNumSM);
-            printf("#RAM Size        : %d KByte\n", EscInfo.ucRamSize);
-            printf("Port Description : %x\n", EscInfo.ucPortDescription);
-            printf("Features         : %04lx\n", (unsigned long)EscInfo.ulFeatures);
+            fprintf(ECMlogFile,"Version          : %d.%d\n", EscInfo.ucRevision, EscInfo.usBuild);
+            fprintf(ECMlogFile,"#FMMUs           : %d\n", EscInfo.ucNumFMMU);
+            fprintf(ECMlogFile,"#SM              : %d\n", EscInfo.ucNumSM);
+            fprintf(ECMlogFile,"#RAM Size        : %d KByte\n", EscInfo.ucRamSize);
+            fprintf(ECMlogFile,"Port Description : %x\n", EscInfo.ucPortDescription);
+            fprintf(ECMlogFile,"Features         : %04lx\n", (unsigned long)EscInfo.ulFeatures);
         }
 
         /* Dump DL status register */
         ECM_GET_DL_STATUS(hndMaster, iAddr, &usStatusDL, &result);
 
         if (ECM_SUCCESS == result) {
-            printf("\nESC DL Status:\n");
-            printf("--------------\n");
-            printf("PDI Operational         : %s\n",
+            fprintf(ECMlogFile,"\nESC DL Status:\n");
+            fprintf(ECMlogFile,"--------------\n");
+            fprintf(ECMlogFile,"PDI Operational         : %s\n",
                 (usStatusDL & ESC_DL_STATUS_PDI_OPERATIONAL) ? "True" : "False");
-            printf("PDI Watchdog            : %s\n",
+            fprintf(ECMlogFile,"PDI Watchdog            : %s\n",
                 (usStatusDL & ESC_DL_STATUS_WD_RELOADED) ? "Running" : "Expired");
-            printf("Enhanced Link Detection : %s\n",
+            fprintf(ECMlogFile,"Enhanced Link Detection : %s\n",
                 (usStatusDL & ESC_DL_STATUS_ENH_LINK_DETECT) ? "Enabled" : "Disabled");
             for (port = 0; port < 4; port++) {
-                printf("Physicl link port %c     : %s\n", 'A'+ port,
+                fprintf(ECMlogFile,"Physicl link port %c     : %s\n", 'A'+ port,
                     (usStatusDL & ESC_DL_STATUS_ACT_LINK_PORT0 << port) ?
                     "Active" : "Inactive");
             }
             for (port = 0; port < 4; port++) {
-                printf("Loop state port %c       : ", 'A'+ port);
+                fprintf(ECMlogFile,"Loop state port %c       : ", 'A'+ port);
                 switch(ECM_ESC_GET_PORT_LOOP_CONFIG(usStatusDL, port)) {
                         case 0x00:
-                            printf("Open, no stable communication\n");
+                            fprintf(ECMlogFile,"Open, no stable communication\n");
                             break;
                         case 0x01:
-                            printf("Closed, no stable communication\n");
+                            fprintf(ECMlogFile,"Closed, no stable communication\n");
                             break;
                         case 0x02:
-                            printf("Open, communication established\n");
+                            fprintf(ECMlogFile,"Open, communication established\n");
                             break;
                         case 0x03:
-                            printf("Closed, communication established\n");
+                            fprintf(ECMlogFile,"Closed, communication established\n");
                             break;
                 }
             }
@@ -1405,13 +1404,13 @@ static int PrintEscRegister(ECM_HANDLE hndMaster)
 
         for (port = 0; port < 4; port++) {
             if (usStatusDL & ESC_DL_STATUS_ACT_LINK_PORT0 << port) {
-                printf("Invalid frames port %c   : %d\n", 'A'+ port,
+                fprintf(ECMlogFile,"Invalid frames port %c   : %d\n", 'A'+ port,
                     *((uint8_t *)&EscErrorCounter + (port << 1)));
-                printf("Rx errors port %c        : %d\n", 'A'+ port,
+                fprintf(ECMlogFile,"Rx errors port %c        : %d\n", 'A'+ port,
                     *((uint8_t *)&EscErrorCounter + 1 + (port << 1)));
-                printf("Forwarded errors port %c : %d\n", 'A'+ port,
+                fprintf(ECMlogFile,"Forwarded errors port %c : %d\n", 'A'+ port,
                     *((uint8_t *)&EscErrorCounter + 8 + port));
-                printf("Lost link port %c        : %d\n", 'A'+ port,
+                fprintf(ECMlogFile,"Lost link port %c        : %d\n", 'A'+ port,
                     *((uint8_t *)&EscErrorCounter + 16 + port));
             }
         }
@@ -1428,7 +1427,7 @@ static int PrintEscRegister(ECM_HANDLE hndMaster)
         if (result != ECM_SUCCESS) {
             ecmFormatError(result, ECM_ERROR_FORMAT_LONG, (char *)ucBuffer,
                 sizeof(ucBuffer));
-            printf("Assigning EEPROM to ECAT failed with %d: %s\n", result, ucBuffer);
+            fprintf(ECMlogFile,"Assigning EEPROM to ECAT failed with %d: %s\n", result, ucBuffer);
         }
 
         /*
@@ -1447,18 +1446,18 @@ static int PrintEscRegister(ECM_HANDLE hndMaster)
         if (result != ECM_SUCCESS) {
             ecmFormatError(result, ECM_ERROR_FORMAT_LONG, (char *)ucBuffer,
                            sizeof(ucBuffer));
-            printf("Reading EEPROM failed with %d: %s\n", result, ucBuffer);
+            fprintf(ECMlogFile,"Reading EEPROM failed with %d: %s\n", result, ucBuffer);
         } else {
             if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_ESI) != 0) {
-                printf("\nESI EEPROM data:\n");
-                printf("-----------------\n");
+                fprintf(ECMlogFile,"\nESI EEPROM data:\n");
+                fprintf(ECMlogFile,"-----------------\n");
                 PrintEsiInformation((char *)ucBuffer, usBufferSz);
             } else {
-                printf("\nEEPROM data:\n");
-                printf("------------\n");
+                fprintf(ECMlogFile,"\nEEPROM data:\n");
+                fprintf(ECMlogFile,"------------\n");
                 hexDump(ucBuffer, usBufferSz, 0);
             }
-            printf("\n");
+            fprintf(ECMlogFile,"\n");
         }
 
         iAddr--;
@@ -1472,59 +1471,59 @@ static int PrintEscRegister(ECM_HANDLE hndMaster)
  */
 static void PrintVersionInformation(ECM_VERSION *pecmVersion)
 {
-    printf("ESD EtherCAT master : V%x.%x.%x",
+    fprintf(ECMlogFile,"ESD EtherCAT master : V%x.%x.%x",
         (pecmVersion->usVersionMaster >> 12) & 0x0F,
         (pecmVersion->usVersionMaster >>  8) & 0x0F,
         (pecmVersion->usVersionMaster      ) & 0xFF);
     if (pecmVersion->ulFeatures & ECM_FEATURE_DEBUG_BUILD) {
-        printf(" (Debug build)");
+        fprintf(ECMlogFile," (Debug build)");
     }
     if (pecmVersion->ulFeatures & ECM_FEATURE_TRIAL_VERSION) {
-        printf(" (Trial version)");
+        fprintf(ECMlogFile," (Trial version)");
     }
-    printf("\n");
-    printf("Expat XML-Parser    : V%x.%x.%x\n",
+    fprintf(ECMlogFile,"\n");
+    fprintf(ECMlogFile,"Expat XML-Parser    : V%x.%x.%x\n",
         (pecmVersion->usVersionParser >> 12) & 0x0F,
         (pecmVersion->usVersionParser >>  8) & 0x0F,
         (pecmVersion->usVersionParser      ) & 0xFF);
-    printf("Zlib compression    : V%x.%x.%x\n",
+    fprintf(ECMlogFile,"Zlib compression    : V%x.%x.%x\n",
         (pecmVersion->usVersionZlib >> 12) & 0x0F,
         (pecmVersion->usVersionZlib >>  8) & 0x0F,
         (pecmVersion->usVersionZlib      ) & 0xFF);
-    printf("HAL layer           : V%x.%x.%x\n",
+    fprintf(ECMlogFile,"HAL layer           : V%x.%x.%x\n",
         (pecmVersion->usVersionHal >> 12) & 0x0F,
         (pecmVersion->usVersionHal >>  8) & 0x0F,
         (pecmVersion->usVersionHal      ) & 0xFF);
-    printf("Remote protocol     : V%x.%x.%x\n",
+    fprintf(ECMlogFile,"Remote protocol     : V%x.%x.%x\n",
         (pecmVersion->usVersionRemote >> 12) & 0x0F,
         (pecmVersion->usVersionRemote >>  8) & 0x0F,
         (pecmVersion->usVersionRemote      ) & 0xFF);
-    printf("Operating system    : V%d.%d.%d (",
+    fprintf(ECMlogFile,"Operating system    : V%d.%d.%d (",
         (pecmVersion->usVersionOs >> 12) & 0x0F,
         (pecmVersion->usVersionOs >>  8) & 0x0F,
         (pecmVersion->usVersionOs      ) & 0xFF);
     switch(pecmVersion->usTypeOs & ECM_OS_TYPE_MASK) {
-        case ECM_OS_TYPE_WIN32:   printf("Windows"); break;
-        case ECM_OS_TYPE_LINUX:   printf("Linux"); break;
-        case ECM_OS_TYPE_NTO:     printf("QNX/Neutrino"); break;
-        case ECM_OS_TYPE_VXWORKS: printf("VxWorks"); break;
-        case ECM_OS_TYPE_RTX:     printf("RTX"); break;
-        case ECM_OS_TYPE_WINCE:   printf("WinCE"); break;
-        case ECM_OS_TYPE_OS9:     printf("OS-9"); break;
-        default: printf("Unknown"); break;
+        case ECM_OS_TYPE_WIN32:   fprintf(ECMlogFile,"Windows"); break;
+        case ECM_OS_TYPE_LINUX:   fprintf(ECMlogFile,"Linux"); break;
+        case ECM_OS_TYPE_NTO:     fprintf(ECMlogFile,"QNX/Neutrino"); break;
+        case ECM_OS_TYPE_VXWORKS: fprintf(ECMlogFile,"VxWorks"); break;
+        case ECM_OS_TYPE_RTX:     fprintf(ECMlogFile,"RTX"); break;
+        case ECM_OS_TYPE_WINCE:   fprintf(ECMlogFile,"WinCE"); break;
+        case ECM_OS_TYPE_OS9:     fprintf(ECMlogFile,"OS-9"); break;
+        default: fprintf(ECMlogFile,"Unknown"); break;
     }
-	printf(" / %d-bit", (pecmVersion->usTypeOs & ECM_OS_64BIT) ? 64 : 32);
-    printf(" / %s endian)\n", (pecmVersion->usTypeOs & ECM_OS_BIG_ENDIAN) ?
+	fprintf(ECMlogFile," / %d-bit", (pecmVersion->usTypeOs & ECM_OS_64BIT) ? 64 : 32);
+    fprintf(ECMlogFile," / %s endian)\n", (pecmVersion->usTypeOs & ECM_OS_BIG_ENDIAN) ?
                               "Big" : "Little");
     if(pecmVersion->pszBuildString != NULL) {
-        printf("Build information   : %s\n",
+        fprintf(ECMlogFile,"Build information   : %s\n",
             pecmVersion->pszBuildString);
     }
-    printf("Min. cycle time     : %lu us\n",
+    fprintf(ECMlogFile,"Min. cycle time     : %lu us\n",
        (unsigned long)pecmVersion->ulMinCycleTime);
-    printf("Highres counter     : %lu ticks/sec\n",
+    fprintf(ECMlogFile,"Highres counter     : %lu ticks/sec\n",
        (unsigned long)g_ulCyclesPerSec);
-    printf("Features            : 0x%08lx\n",
+    fprintf(ECMlogFile,"Features            : 0x%08lx\n",
        (unsigned long)pecmVersion->ulFeatures);
 }
 
@@ -1539,26 +1538,26 @@ static void PrintDeviceDescription(ECM_HANDLE hndDevice)
         return;
     }
 
-    printf("Primary adapter MAC   : %02X-%02X-%02X-%02X-%02X-%02X\n",
+    fprintf(ECMlogFile,"Primary adapter MAC   : %02X-%02X-%02X-%02X-%02X-%02X\n",
         descDevice.macAddr[ECM_NIC_PRIMARY].b[0],
         descDevice.macAddr[ECM_NIC_PRIMARY].b[1],
         descDevice.macAddr[ECM_NIC_PRIMARY].b[2],
         descDevice.macAddr[ECM_NIC_PRIMARY].b[3],
         descDevice.macAddr[ECM_NIC_PRIMARY].b[4],
         descDevice.macAddr[ECM_NIC_PRIMARY].b[5]);
-    printf("Redundant adapter MAC : %02X-%02X-%02X-%02X-%02X-%02X\n",
+    fprintf(ECMlogFile,"Redundant adapter MAC : %02X-%02X-%02X-%02X-%02X-%02X\n",
         descDevice.macAddr[ECM_NIC_REDUNDANT].b[0],
         descDevice.macAddr[ECM_NIC_REDUNDANT].b[1],
         descDevice.macAddr[ECM_NIC_REDUNDANT].b[2],
         descDevice.macAddr[ECM_NIC_REDUNDANT].b[3],
         descDevice.macAddr[ECM_NIC_REDUNDANT].b[4],
         descDevice.macAddr[ECM_NIC_REDUNDANT].b[5]);
-    printf("Cycle time            : %d\n", descDevice.ulCycleTime);
-    printf("Watchdog cycle        : %d\n", descDevice.usCycleWatchdog);
-    printf("Link check cycle      : %d\n", descDevice.usCycleLinkState);
-    printf("DC control cycle      : %d\n", descDevice.usCycleDcCtrl);
-    printf("Max acyclic frames    : %d\n", descDevice.usAcycCtrl);
-    printf("\n");
+    fprintf(ECMlogFile,"Cycle time            : %d\n", descDevice.ulCycleTime);
+    fprintf(ECMlogFile,"Watchdog cycle        : %d\n", descDevice.usCycleWatchdog);
+    fprintf(ECMlogFile,"Link check cycle      : %d\n", descDevice.usCycleLinkState);
+    fprintf(ECMlogFile,"DC control cycle      : %d\n", descDevice.usCycleDcCtrl);
+    fprintf(ECMlogFile,"Max acyclic frames    : %d\n", descDevice.usAcycCtrl);
+    fprintf(ECMlogFile,"\n");
 
     return;
 }
@@ -1577,7 +1576,7 @@ static void PrintMasterDescription(ECM_HANDLE hndMaster)
         return;
     }
 
-    printf("Device Name       : %s\n", descMaster.szName);
+    fprintf(ECMlogFile,"Device Name       : %s\n", descMaster.szName);
 
     /* Call a 2nd time to get (optional) ENI filename */
     descMaster.ulFlags = ECM_FLAG_MASTER_ENI_FILENAME;
@@ -1585,7 +1584,7 @@ static void PrintMasterDescription(ECM_HANDLE hndMaster)
         return;
     }
     if((descMaster.ulFlags & ECM_FLAG_MASTER_ENI_FILENAME) != 0) {
-        printf("ENI filename      : %s\n", descMaster.szName);
+        fprintf(ECMlogFile,"ENI filename      : %s\n", descMaster.szName);
     }
 
     /* Call a 3rd time to get (optional) project GUID */
@@ -1594,45 +1593,45 @@ static void PrintMasterDescription(ECM_HANDLE hndMaster)
         return;
     }
     if((descMaster.ulFlags & ECM_FLAG_MASTER_PROJECT_GUID) != 0) {
-        printf("Project GUID      : %s\n", descMaster.szName);
+        fprintf(ECMlogFile,"Project GUID      : %s\n", descMaster.szName);
     }
 
-    printf("Destination MAC   : %02X-%02X-%02X-%02X-%02X-%02X\n",
+    fprintf(ECMlogFile,"Destination MAC   : %02X-%02X-%02X-%02X-%02X-%02X\n",
         descMaster.macAddr.b[0], descMaster.macAddr.b[1],
         descMaster.macAddr.b[2], descMaster.macAddr.b[3],
         descMaster.macAddr.b[4], descMaster.macAddr.b[5]);
-    printf("VLAN TCI          : %04x\n", descMaster.vlanTCI);
-    printf("Mbox slaves       : %04x\n", descMaster.usMboxCount);
-    printf("Mbox State Addr.  : %08lx\n",
+    fprintf(ECMlogFile,"VLAN TCI          : %04x\n", descMaster.vlanTCI);
+    fprintf(ECMlogFile,"Mbox slaves       : %04x\n", descMaster.usMboxCount);
+    fprintf(ECMlogFile,"Mbox State Addr.  : %08lx\n",
         (unsigned long)descMaster.ulMboxStateAddr);
-    printf("Recv (Addr/Size)  : %p/%lu\n",
+    fprintf(ECMlogFile,"Recv (Addr/Size)  : %p/%lu\n",
         descMaster.pInput, (unsigned long)descMaster.ulSzInput);
-    printf("Send (Addr/Size)  : %p/%lu\n",
+    fprintf(ECMlogFile,"Send (Addr/Size)  : %p/%lu\n",
         descMaster.pOutput, (unsigned long)descMaster.ulSzOutput);
-    printf("DC Mode           : ");
+    fprintf(ECMlogFile,"DC Mode           : ");
     if(descMaster.ulFlags & ECM_FLAG_MASTER_DC) {
-        printf("Enabled");
+        fprintf(ECMlogFile,"Enabled");
         if(descMaster.ulFlags & ECM_FLAG_MASTER_DC_RESYNC) {
-            printf(" + Cont. Drift Compensation");
+            fprintf(ECMlogFile," + Cont. Drift Compensation");
         }
         if(descMaster.ulFlags & ECM_FLAG_MASTER_DCM_CLOCK_SHIFT) {
-            printf(" + Master Clock Sync.");
+            fprintf(ECMlogFile," + Master Clock Sync.");
         }
-        printf("\nUser Shift Master : %d us\n", descMaster.sDcUserShift);
-        printf("DC SysTime Epoch  : ");
+        fprintf(ECMlogFile,"\nUser Shift Master : %d us\n", descMaster.sDcUserShift);
+        fprintf(ECMlogFile,"DC SysTime Epoch  : ");
         if(ECM_SYSTIME_EPOCH_UNIX == descMaster.ucDcSysTimeEpoch) {
             time_t now = time(NULL);
-            printf("%s", asctime(gmtime(&now)));
+            fprintf(ECMlogFile,"%s", asctime(gmtime(&now)));
         } else if(ECM_SYSTIME_EPOCH_NONE == descMaster.ucDcSysTimeEpoch) {
-            printf("Reference clock\n");
+            fprintf(ECMlogFile,"Reference clock\n");
         } else {
-            printf("Sat Jan 01 00:00:00 2000");
+            fprintf(ECMlogFile,"Sat Jan 01 00:00:00 2000");
         }
     } else {
-        printf("Disabled");
+        fprintf(ECMlogFile,"Disabled");
     }
 
-    printf("\n");
+    fprintf(ECMlogFile,"\n");
 
     return;
 }
@@ -1648,29 +1647,29 @@ static void PrintSlaveDescription(ECM_HANDLE hndSlave)
         return;
     }
 
-    printf("Device Name       : %s\n", descSlave.szName);
-    printf("Phys Addr.        : %04x\n", descSlave.usPhysAddr);
-    printf("Auto Inc Addr.    : %04x\n", descSlave.usAutoIncAddr);
-    printf("Vendor ID         : %08lx\n", (unsigned long)descSlave.ulVendorId);
-    printf("Product Code      : %08lx\n", (unsigned long)descSlave.ulProductCode);
-    printf("Revision No.      : %08lx\n", (unsigned long)descSlave.ulRevisionNo);
-    printf("Serial No.        : %08lx\n", (unsigned long)descSlave.ulSerialNo);
-    printf("Recv (Start/Size) : %lu/%lu\n",
+    fprintf(ECMlogFile,"Device Name       : %s\n", descSlave.szName);
+    fprintf(ECMlogFile,"Phys Addr.        : %04x\n", descSlave.usPhysAddr);
+    fprintf(ECMlogFile,"Auto Inc Addr.    : %04x\n", descSlave.usAutoIncAddr);
+    fprintf(ECMlogFile,"Vendor ID         : %08lx\n", (unsigned long)descSlave.ulVendorId);
+    fprintf(ECMlogFile,"Product Code      : %08lx\n", (unsigned long)descSlave.ulProductCode);
+    fprintf(ECMlogFile,"Revision No.      : %08lx\n", (unsigned long)descSlave.ulRevisionNo);
+    fprintf(ECMlogFile,"Serial No.        : %08lx\n", (unsigned long)descSlave.ulSerialNo);
+    fprintf(ECMlogFile,"Recv (Start/Size) : %lu/%lu\n",
             (unsigned long)descSlave.ulRecvBitStart,
             (unsigned long)descSlave.ulRecvBitLength);
-    printf("Send (Start/Size) : %lu/%lu\n",
+    fprintf(ECMlogFile,"Send (Start/Size) : %lu/%lu\n",
             (unsigned long)descSlave.ulSendBitStart,
             (unsigned long)descSlave.ulSendBitLength);
     if(descSlave.ulFlags & ECM_FLAG_SLAVE_DC) {
-        printf("DC Support        : %s Bit (DC %s)\n",
+        fprintf(ECMlogFile,"DC Support        : %s Bit (DC %s)\n",
             (descSlave.ulFlags & ECM_FLAG_SLAVE_DC64) ? "32" : "64",
             (descSlave.ulFlags & ECM_FLAG_SLAVE_DC_REFCLOCK) ? "Master" : "Slave");
-        printf("SYNC0/1 (Shift)   : %lu/%lu (%ld) ns\n",
+        fprintf(ECMlogFile,"SYNC0/1 (Shift)   : %lu/%lu (%ld) ns\n",
             (unsigned long)descSlave.ulCycleTime0,
             (unsigned long)descSlave.ulCycleTime1,
             (long)descSlave.lShiftTime);
     }
-    printf("\n");
+    fprintf(ECMlogFile,"\n");
 
     return;
 }
@@ -1704,16 +1703,16 @@ static void PrintCopyVector(ECM_HANDLE hndMaster)
             ulSum = 0;
             result = ecmGetCopyVector(hndMaster, pCopyVector, &ulEntries, ECM_INPUT_DATA);
             if (ECM_SUCCESS == result) {
-                printf("Input process image:\n");
-                printf("--------------------\n");
+                fprintf(ECMlogFile,"Input process image:\n");
+                fprintf(ECMlogFile,"--------------------\n");
                 for (i = 0; i < ulEntries; i++) {
-                    printf("Offset = %08lu Size: %08lx\n",
+                    fprintf(ECMlogFile,"Offset = %08lu Size: %08lx\n",
                             (unsigned long)pCopyVector[i].ulOffset,
                             (unsigned long)pCopyVector[i].ulSize);
                     ulSum += pCopyVector[i].ulSize;
                 }
             }
-            printf("---> %lu / %lu bytes to copy (%ld %%)\n",
+            fprintf(ECMlogFile,"---> %lu / %lu bytes to copy (%ld %%)\n",
                    (unsigned long)ulSum, (unsigned long)descMaster.ulSzInput,
                    (long)((ulSum  * 100) / descMaster.ulSzInput));
             free(pCopyVector);
@@ -1728,16 +1727,16 @@ static void PrintCopyVector(ECM_HANDLE hndMaster)
             ulSum = 0;
             result = ecmGetCopyVector(hndMaster, pCopyVector, &ulEntries, ECM_OUTPUT_DATA);
             if (ECM_SUCCESS == result) {
-                printf("Output process image:\n");
-                printf("---------------------\n");
+                fprintf(ECMlogFile,"Output process image:\n");
+                fprintf(ECMlogFile,"---------------------\n");
                 for (i = 0; i < ulEntries; i++) {
-                    printf("Offset = %08lu Size: %08lu\n",
+                    fprintf(ECMlogFile,"Offset = %08lu Size: %08lu\n",
                             (unsigned long)pCopyVector[i].ulOffset,
                             (unsigned long)pCopyVector[i].ulSize);
                     ulSum += pCopyVector[i].ulSize;
                 }
             }
-            printf("---> %lu / %lu bytes to copy (%lu %%)\n",
+            fprintf(ECMlogFile,"---> %lu / %lu bytes to copy (%lu %%)\n",
                     (unsigned long)ulSum, (unsigned long)descMaster.ulSzOutput,
                     (unsigned long)((ulSum  * 100) / descMaster.ulSzOutput));
             free(pCopyVector);
@@ -1762,101 +1761,101 @@ static void PrintStatistic(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster)
         return;
     }
 
-    printf("Adapter Statistic\n");
-    printf("-----------------\n");
+    fprintf(ECMlogFile,"Adapter Statistic\n");
+    fprintf(ECMlogFile,"-----------------\n");
 
     /* Request NIC statistic */
     result = ecmGetNicStatistic(hndDevice, &diagPrimary, &diagRedundant);
     if (ECM_SUCCESS == result) {
-        printf("Primary:\n");
-        printf(" RX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
+        fprintf(ECMlogFile,"Primary:\n");
+        fprintf(ECMlogFile," RX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
             (unsigned long)diagPrimary.ulRxFrames,
             (unsigned long)diagPrimary.ulRxErrors,
             (unsigned long)diagPrimary.ulRxDiscarded);
-        printf(" TX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
+        fprintf(ECMlogFile," TX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
             (unsigned long)diagPrimary.ulTxFrames,
             (unsigned long)diagPrimary.ulTxErrors,
             (unsigned long)diagPrimary.ulTxDiscarded);
         if(diagPrimary.ulSupportedMask &
             (ECM_STATISTIC_RX_BYTES | ECM_STATISTIC_TX_BYTES)) {
-                printf(" Bytes (Rx / Tx) %lu, %lu\n",
+                fprintf(ECMlogFile," Bytes (Rx / Tx) %lu, %lu\n",
                     (unsigned long)diagPrimary.ulRxBytes,
                     (unsigned long)diagPrimary.ulTxBytes);
 
         }
         if ((ulConfigFlags & ECM_TEST_FLAG_REDUNDANCY) != 0) {
-            printf("Redundant:\n");
-            printf(" RX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
+            fprintf(ECMlogFile,"Redundant:\n");
+            fprintf(ECMlogFile," RX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
                 (unsigned long)diagRedundant.ulRxFrames,
                 (unsigned long)diagRedundant.ulRxErrors,
                 (unsigned long)diagRedundant.ulRxDiscarded);
-            printf(" TX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
+            fprintf(ECMlogFile," TX Frames (Total / Errors / Discarded) %lu, %lu, %lu\n",
                 (unsigned long)diagRedundant.ulTxFrames,
                 (unsigned long)diagRedundant.ulTxErrors,
                 (unsigned long)diagRedundant.ulTxDiscarded);
             if(diagRedundant.ulSupportedMask &
                 (ECM_STATISTIC_RX_BYTES | ECM_STATISTIC_TX_BYTES)) {
-                    printf(" Bytes (Rx / Tx) %lu, %lu\n",
+                    fprintf(ECMlogFile," Bytes (Rx / Tx) %lu, %lu\n",
                         (unsigned long)diagRedundant.ulRxBytes,
                         (unsigned long)diagRedundant.ulTxBytes);
             }
         }
     }
-    printf("\n");
+    fprintf(ECMlogFile,"\n");
 
 
-    printf("Device Statistic\n");
-    printf("----------------\n");
+    fprintf(ECMlogFile,"Device Statistic\n");
+    fprintf(ECMlogFile,"----------------\n");
 
     /* Request device statistic */
     result = ecmGetDeviceStatistic(hndDevice, &diagDevPri, &diagDevRed);
     if (ECM_SUCCESS == result) {
-        printf("Primary:\n");
-        printf(" RX Frames (Total / ECAT / Discarded) %lu, %lu, %lu\n",
+        fprintf(ECMlogFile,"Primary:\n");
+        fprintf(ECMlogFile," RX Frames (Total / ECAT / Discarded) %lu, %lu, %lu\n",
                 (unsigned long)diagDevPri.ulRxFrames,
                 (unsigned long)diagDevPri.ulRxEcatFrames,
                 (unsigned long)diagDevPri.ulRxDiscarded);
-        printf(" TX Frames (Total / Error) %lu, %lu\n",
+        fprintf(ECMlogFile," TX Frames (Total / Error) %lu, %lu\n",
                 (unsigned long)diagDevPri.ulTxEcatFrames,
                 (unsigned long)diagDevPri.ulTxError);
-        printf(" Link lost %lu\n",
+        fprintf(ECMlogFile," Link lost %lu\n",
                 (unsigned long)diagDevPri.ulLostLink);
         if ((ulConfigFlags & ECM_TEST_FLAG_REDUNDANCY) != 0) {
-      printf("Redundant:\n");
-      printf(" RX Frames (Total / ECAT / Discarded) %lu, %lu, %lu\n",
+      fprintf(ECMlogFile,"Redundant:\n");
+      fprintf(ECMlogFile," RX Frames (Total / ECAT / Discarded) %lu, %lu, %lu\n",
               (unsigned long)diagDevRed.ulRxFrames,
               (unsigned long)diagDevRed.ulRxEcatFrames,
               (unsigned long)diagDevRed.ulRxDiscarded);
-      printf(" TX Frames (Total / Error) %lu, %lu\n",
+      fprintf(ECMlogFile," TX Frames (Total / Error) %lu, %lu\n",
               (unsigned long)diagDevRed.ulTxEcatFrames,
               (unsigned long)diagDevRed.ulTxError);
-      printf(" Link lost %lu\n", (unsigned long)diagDevRed.ulLostLink);
+      fprintf(ECMlogFile," Link lost %lu\n", (unsigned long)diagDevRed.ulLostLink);
     }
     }
-    printf("\n");
+    fprintf(ECMlogFile,"\n");
 
 
-    printf("Master Statistic\n");
-    printf("----------------\n");
+    fprintf(ECMlogFile,"Master Statistic\n");
+    fprintf(ECMlogFile,"----------------\n");
 
     /* Request master statistic */
     result = ecmGetMasterStatistic(hndMaster, &diagMaster);
     if (ECM_SUCCESS == result) {
-        printf("RX Frames (Acyclic / Cyclic / Async) %lu, %lu, %lu\n",
+        fprintf(ECMlogFile,"RX Frames (Acyclic / Cyclic / Async) %lu, %lu, %lu\n",
                 (unsigned long)diagMaster.ulRxAcyclicFrames,
                 (unsigned long)diagMaster.ulRxCyclicFrames,
                 (unsigned long)diagMaster.ulRxAsyncFrames);
-        printf("RX Frames discarded (Acyclic / Cyclic / Other) %lu, %lu, %lu\n",
+        fprintf(ECMlogFile,"RX Frames discarded (Acyclic / Cyclic / Other) %lu, %lu, %lu\n",
                 (unsigned long)diagMaster.ulRxAcyclicDiscarded,
                 (unsigned long)diagMaster.ulRxCyclicDiscarded,
                 (unsigned long)diagMaster.ulRxDiscarded);
-        printf("TX Frames (Acyclic / Cyclic / Async) %lu, %lu %lu\n",
+        fprintf(ECMlogFile,"TX Frames (Acyclic / Cyclic / Async) %lu, %lu %lu\n",
                 (unsigned long)diagMaster.ulTxAcyclicFrames,
                 (unsigned long)diagMaster.ulTxCyclicFrames,
                 (unsigned long)diagMaster.ulTxAsyncFrames);
     }
 
-    printf("\n");
+    fprintf(ECMlogFile,"\n");
 }
 
 /*
@@ -1872,33 +1871,33 @@ static void PrintVarList(ECM_HANDLE hndMaster)
         return;
     }
 
-    printf("Process variables (Input):\n");
-    printf("--------------------------\n");
+    fprintf(ECMlogFile,"Process variables (Input):\n");
+    fprintf(ECMlogFile,"--------------------------\n");
     result = ecmGetVariable(hndMaster, &VarDesc, ECM_FLAG_GET_FIRST);
     while(ECM_SUCCESS == result) {
-        printf("%s (%s)\n\tSize: %02d - Offset:%lu\n",
+        fprintf(ECMlogFile,"%s (%s)\n\tSize: %02d - Offset:%lu\n",
             VarDesc.pszName,
             (VarDesc.usDataType & ECM_FLAG_VAR_INPUT) ? "Input" : "Output",
             VarDesc.usBitSize, (unsigned long)VarDesc.ulBitOffs);
 #if 0
         if (VarDesc.pszComment != NULL) {
-            printf("\t%s", VarDesc.pszComment);
+            fprintf(ECMlogFile,"\t%s", VarDesc.pszComment);
         }
 #endif
-        printf("\n\n");
+        fprintf(ECMlogFile,"\n\n");
         result = ecmGetVariable(hndMaster, &VarDesc, ECM_FLAG_GET_NEXT);
     }
 
-    printf("Process variables:\n");
-    printf("------------------\n");
+    fprintf(ECMlogFile,"Process variables:\n");
+    fprintf(ECMlogFile,"------------------\n");
     result = ecmLookupVariable(hndMaster, "Dev", &VarDesc, ECM_FLAG_GET_FIRST);
     while(ECM_SUCCESS == result) {
-        printf("%s\n\tSize: %02d - Offset:%lu\n\n",
+        fprintf(ECMlogFile,"%s\n\tSize: %02d - Offset:%lu\n\n",
             VarDesc.pszName, VarDesc.usBitSize, (unsigned long)VarDesc.ulBitOffs);
         result = ecmLookupVariable(hndMaster, "Dev", &VarDesc, ECM_FLAG_GET_NEXT);
     }
      
-    printf("Here\n");
+    fprintf(ECMlogFile,"Here\n");
 }
 
 /*
@@ -1914,7 +1913,7 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
         if(g_ulProfileMask & ECM_TEST_PROF_INPUT) {
             result = ecmGetProfilingData(hndDevice, &profData, ECM_PROFILE_INPUT);
             if (ECM_SUCCESS == result) {
-                printf("IN: (%lu / %lu / %lu)  ",
+                fprintf(ECMlogFile,"IN: (%lu / %lu / %lu)  ",
                     (unsigned long)profData.ulMin,
                     (unsigned long)profData.ulAvg,
                     (unsigned long)profData.ulMax);
@@ -1926,7 +1925,7 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
         if(g_ulProfileMask & ECM_TEST_PROF_OUTPUT) {
             result = ecmGetProfilingData(hndDevice, &profData, ECM_PROFILE_OUTPUT);
             if (ECM_SUCCESS == result) {
-                printf("OUT: (%lu / %lu / %lu)  ",
+                fprintf(ECMlogFile,"OUT: (%lu / %lu / %lu)  ",
                     (unsigned long)profData.ulMin,
                     (unsigned long)profData.ulAvg,
                     (unsigned long)profData.ulMax);
@@ -1938,7 +1937,7 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
         if(g_ulProfileMask & ECM_TEST_PROF_FRAME_TX) {
             result = ecmGetProfilingData(hndDevice, &profData, ECM_PROFILE_FRAME_TX);
             if (ECM_SUCCESS == result) {
-                printf("TX: (%lu / %lu / %lu)",
+                fprintf(ECMlogFile,"TX: (%lu / %lu / %lu)",
                     (unsigned long)profData.ulMin,
                     (unsigned long)profData.ulAvg,
                     (unsigned long)profData.ulMax);
@@ -1946,7 +1945,7 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
             }
         }
 
-        printf("\n");
+        fprintf(ECMlogFile,"\n");
     }
 
 
@@ -1955,12 +1954,12 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
         /* Get profiling data of ecmProcessAcylicCommunication() */
         if(g_ulProfileMask & ECM_TEST_PROF_CYCLIC) {
             if(g_ulProfileMask & ECM_TEST_PROF_MODE_NO_IO_TIME) {
-                printf("*");
+                fprintf(ECMlogFile,"*");
             }
             /* Get profiling data of ecmProcessInputData() */
             result = ecmGetProfilingData(hndDevice, &profData, ECM_PROFILE_CYCLIC_WORKER);
             if (ECM_SUCCESS == result) {
-                printf("CYC: (%lu / %lu / %lu)  ",
+                fprintf(ECMlogFile,"CYC: (%lu / %lu / %lu)  ",
                     (unsigned long)profData.ulMin,
                     (unsigned long)profData.ulAvg,
                     (unsigned long)profData.ulMax);
@@ -1972,7 +1971,7 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
         if(g_ulProfileMask & ECM_TEST_PROF_ACYLIC) {
             result = ecmGetProfilingData(hndDevice, &profData, ECM_PROFILE_ACYCLIC);
             if (ECM_SUCCESS == result) {
-                printf("ACYC: (%lu / %lu / %lu)",
+                fprintf(ECMlogFile,"ACYC: (%lu / %lu / %lu)",
                     (unsigned long)profData.ulMin,
                     (unsigned long)profData.ulAvg,
                     (unsigned long)profData.ulMax);
@@ -1980,7 +1979,7 @@ static void PrintProfilingData(ECM_HANDLE hndDevice)
             }
         }
 
-        printf("\n");
+        fprintf(ECMlogFile,"\n");
     }
 
     return;
@@ -2018,7 +2017,7 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     int                        result;
 
     ecmSoeIdnToStr(usIDN, buffer);
-    printf("%s ", buffer);
+    fprintf(ECMlogFile,"%s ", buffer);
 
 
     /* Request element name of data block */
@@ -2029,9 +2028,9 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     result = ecmSoeUpload(hndSlave, &mboxHead, buffer, &szBuffer);
     if (result != ECM_SUCCESS) {
         if(mboxHead.soe.ucCommand & ECM_SOE_FLAG_ERROR) {
-            printf("*E:%04x*          ", mboxHead.soe.u.usError);
+            fprintf(ECMlogFile,"*E:%04x*          ", mboxHead.soe.u.usError);
         } else {
-            printf("!E:%04x!          ", result);
+            fprintf(ECMlogFile,"!E:%04x!          ", result);
         }
     } else {
         pSoeString = (PECM_SOE_STRING)buffer;
@@ -2040,7 +2039,7 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
         } else {
             pSoeString->cString[pSoeString->ucLength] = '\0';
         }
-        printf("%-20s ", pSoeString->cString);
+        fprintf(ECMlogFile,"%-20s ", pSoeString->cString);
     }
 
     /* Request unit of data block */
@@ -2051,14 +2050,14 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     result = ecmSoeUpload(hndSlave, &mboxHead, buffer, &szBuffer);
     if (result != ECM_SUCCESS) {
         if(mboxHead.soe.ucCommand & ECM_SOE_FLAG_ERROR) {
-            printf("*E:%04x*  ", mboxHead.soe.u.usError);
+            fprintf(ECMlogFile,"*E:%04x*  ", mboxHead.soe.u.usError);
         } else {
-            printf("!E:%04x!  ", result);
+            fprintf(ECMlogFile,"!E:%04x!  ", result);
         }
     } else {
         pSoeString = (PECM_SOE_STRING)buffer;
         pSoeString->cString[pSoeString->ucLength] = '\0';
-        printf("%-10s", pSoeString->cString);
+        fprintf(ECMlogFile,"%-10s", pSoeString->cString);
     }
 
     /* Request attribute of data block */
@@ -2068,10 +2067,10 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     szBuffer = sizeof(buffer);
     result = ecmSoeUpload(hndSlave, &mboxHead, buffer, &szBuffer);
     if (result != ECM_SUCCESS) {
-        printf("! %04x ! ", result);
+        fprintf(ECMlogFile,"! %04x ! ", result);
     } else {
         ecmCpuToLe(&ulAttributes, buffer, (const uint8_t *)"\x04");
-        printf("%08x ", ulAttributes);
+        fprintf(ECMlogFile,"%08x ", ulAttributes);
     }
 
     /* Request minimum value of data block */
@@ -2082,12 +2081,12 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     result = ecmSoeUpload(hndSlave, &mboxHead, buffer, &szBuffer);
     if (result != ECM_SUCCESS) {
         if(mboxHead.soe.ucCommand & ECM_SOE_FLAG_ERROR) {
-            printf("*E:%04x* ", mboxHead.soe.u.usError);
+            fprintf(ECMlogFile,"*E:%04x* ", mboxHead.soe.u.usError);
         } else {
-            printf("!E:%04x! ", result);
+            fprintf(ECMlogFile,"!E:%04x! ", result);
         }
     } else {
-        printf("%-8d ", *(uint16_t *)&buffer);
+        fprintf(ECMlogFile,"%-8d ", *(uint16_t *)&buffer);
     }
 
     /* Request maximum value of data block */
@@ -2098,12 +2097,12 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     result = ecmSoeUpload(hndSlave, &mboxHead, buffer, &szBuffer);
     if (result != ECM_SUCCESS) {
         if(mboxHead.soe.ucCommand & ECM_SOE_FLAG_ERROR) {
-            printf("*E:%04x* ", mboxHead.soe.u.usError);
+            fprintf(ECMlogFile,"*E:%04x* ", mboxHead.soe.u.usError);
         } else {
-            printf("!E:%04x! ", result);
+            fprintf(ECMlogFile,"!E:%04x! ", result);
         }
     } else {
-        printf("%-8d ", *(uint16_t *)&buffer);
+        fprintf(ECMlogFile,"%-8d ", *(uint16_t *)&buffer);
     }
 
     /* Request value of data block */
@@ -2114,12 +2113,12 @@ static void ecmTestSoeDump(ECM_HANDLE hndSlave, uint16_t usIDN)
     result = ecmSoeUpload(hndSlave, &mboxHead, buffer, &szBuffer);
     if (result != ECM_SUCCESS) {
         if(mboxHead.soe.ucCommand & ECM_SOE_FLAG_ERROR) {
-            printf("*E:%04x*\n", mboxHead.soe.u.usError);
+            fprintf(ECMlogFile,"*E:%04x*\n", mboxHead.soe.u.usError);
         } else {
-            printf("!E:%04x!\n", result);
+            fprintf(ECMlogFile,"!E:%04x!\n", result);
         }
     } else {
-        printf("%d\n", *(uint16_t *)&buffer);
+        fprintf(ECMlogFile,"%d\n", *(uint16_t *)&buffer);
     }
 
     return;
@@ -2160,7 +2159,7 @@ static void ecmTestSoeScan(ECM_HANDLE hndSlave)
         if(mboxHead.soe.ucCommand & ECM_SOE_FLAG_ERROR) {
             ecmFormatError(mboxHead.soe.u.usError, ECM_ERROR_SOE_ERROR_CODE,
                            buffer, sizeof(buffer));
-            printf("SoE upload returned with SoE error 0x%04x (%s)",
+            fprintf(ECMlogFile,"SoE upload returned with SoE error 0x%04x (%s)",
                            mboxHead.soe.u.usError, buffer);
         } else {
             /* Buffer too small */
@@ -2175,7 +2174,7 @@ static void ecmTestSoeScan(ECM_HANDLE hndSlave)
                 }
             } else {
                 ecmFormatError(result, ECM_ERROR_FORMAT_LONG, buffer, sizeof(buffer));
-                printf("SoE upload returned with error %04x (%s)",
+                fprintf(ECMlogFile,"SoE upload returned with error %04x (%s)",
                        result, buffer);
                 break;
             }
@@ -2183,9 +2182,9 @@ static void ecmTestSoeScan(ECM_HANDLE hndSlave)
     } /* of for */
 
     usCount = (usSzList - 4) / 2;
-    printf("SoE Device with %d IDNs\n\n", usCount);
-    printf("   IDN   Name                 Unit      Attrs    Min      Max      Data\n");
-    printf("-------------------------------------------------------------------------------\n");
+    fprintf(ECMlogFile,"SoE Device with %d IDNs\n\n", usCount);
+    fprintf(ECMlogFile,"   IDN   Name                 Unit      Attrs    Min      Max      Data\n");
+    fprintf(ECMlogFile,"-------------------------------------------------------------------------------\n");
 
     /* Iterate the list of all IDNs of the device */
     for(i = 0; i < usCount; i++) {
@@ -2219,18 +2218,18 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
     /* Request number of object dictionary entries from slave */
     result = ecmCoeGetOdList(hndSlave, &OdListCount);
     if (result != ECM_SUCCESS) {
-        printf("Requesting # of OD entries for %s failed with %s\n",
+        fprintf(ECMlogFile,"Requesting # of OD entries for %s failed with %s\n",
                DescSlave.szName, ecmResultToString(result));
         return;
     }
 
-    printf("CoE object dictionary entries (%d) of: %s\n",
+    fprintf(ECMlogFile,"CoE object dictionary entries (%d) of: %s\n",
            OdListCount.usAll, DescSlave.szName);
 
     /* Request list with indexes of all dictionary entries from slave */
     pOdList = (PECM_COE_OD_LIST)calloc(1, ECM_OD_LIST_SIZE(OdListCount.usAll));
     if (NULL == pOdList) {
-        printf("Failed to allocate memory for OD index list\n");
+        fprintf(ECMlogFile,"Failed to allocate memory for OD index list\n");
         return;
     }
 
@@ -2238,7 +2237,7 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
     pOdList->usCount = OdListCount.usAll;
     result = ecmCoeGetOdEntries(hndSlave, pOdList);
     if (result != ECM_SUCCESS) {
-        printf("Requesting list of OD indexes failed with %s\n", ecmResultToString(result));
+        fprintf(ECMlogFile,"Requesting list of OD indexes failed with %s\n", ecmResultToString(result));
         free(pOdList);
         return;
     }
@@ -2246,7 +2245,7 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
     /* Allocate memory for an object dictionary entry description */
     pEntryDesc = (PECM_COE_ENTRY_DESCRIPTION)calloc(1, ECM_OD_ENTRY_SIZE(256));
     if (NULL == pEntryDesc) {
-        printf("Failed to allocate memory for OD entry description\n");
+        fprintf(ECMlogFile,"Failed to allocate memory for OD entry description\n");
         free(pOdList);
         return;
     }
@@ -2259,36 +2258,36 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
         ObjDesc.usIndex = pOdList->usIndex[i];
         result = ecmCoeGetObjDescription(hndSlave, &ObjDesc);
         if (result != ECM_SUCCESS) {
-            printf("  Requesting description for index %04x failed with %s\n",
+            fprintf(ECMlogFile,"  Requesting description for index %04x failed with %s\n",
                    pOdList->usIndex[i], ecmResultToString(result));
             if (ECM_E_ABORTED == result) {
                 uint32_t ulAbortCode;
                 ecmCoeGetAbortCode(hndSlave, &ulAbortCode);
-                printf(" Aborted: %s (0x%08lx)",
+                fprintf(ECMlogFile," Aborted: %s (0x%08lx)",
                     GetAbortCodeText(ulAbortCode), (unsigned long)ulAbortCode);
             }
             continue;
         }
 
         /* Print the object description */
-        printf("%04X (", ObjDesc.usIndex);
+        fprintf(ECMlogFile,"%04X (", ObjDesc.usIndex);
         switch(ObjDesc.ucObjCodeAndCategory & 0xF)
         {
         case ECM_COE_OBJ_ARRAY:
-            printf("ARR");
+            fprintf(ECMlogFile,"ARR");
             break;
         case ECM_COE_OBJ_VAR:
-            printf("VAR");
+            fprintf(ECMlogFile,"VAR");
             break;
         case ECM_COE_OBJ_RECORD:
-            printf("REC");
+            fprintf(ECMlogFile,"REC");
             break;
         default:
-            printf("???");
+            fprintf(ECMlogFile,"???");
             break;
         }
-        printf(" / %c / ", (ObjDesc.ucObjCodeAndCategory & ECM_COE_OBJCAT_MANDATORY) ? 'M' : 'O');
-        printf("%2d) - %s\n", ObjDesc.usDataType, ObjDesc.szName);
+        fprintf(ECMlogFile," / %c / ", (ObjDesc.ucObjCodeAndCategory & ECM_COE_OBJCAT_MANDATORY) ? 'M' : 'O');
+        fprintf(ECMlogFile,"%2d) - %s\n", ObjDesc.usDataType, ObjDesc.szName);
 
         /*
          * Iterate the list of object dictionary sub-entries and request the
@@ -2302,11 +2301,11 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
 
             result = ecmCoeGetEntryDescription(hndSlave, pEntryDesc);
             if (result != ECM_SUCCESS) {
-                printf("  Requesting description of entry (%04x/%02x) failed with %s\n",
+                fprintf(ECMlogFile,"  Requesting description of entry (%04x/%02x) failed with %s\n",
                        pOdList->usIndex[i], j, ecmResultToString(result));
                 if (ECM_E_ABORTED == result) {
                     ecmCoeGetAbortCode(hndSlave, &ulAbortCode);
-                    printf("  Aborted: %s (0x%08lx)",
+                    fprintf(ECMlogFile,"  Aborted: %s (0x%08lx)",
                         GetAbortCodeText(ulAbortCode), (unsigned long)ulAbortCode);
                 }
                 continue;
@@ -2322,36 +2321,36 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
             }
 
             /* Print the object dictionary entry description */
-            printf("  %02X: Bits = %2d Type = %2d ", j, pEntryDesc->usBitLen,
+            fprintf(ECMlogFile,"  %02X: Bits = %2d Type = %2d ", j, pEntryDesc->usBitLen,
                    pEntryDesc->usDataType);
             if (pEntryDesc->usObjectAccess &
                 (ECM_COE_ATTRIB_RP | ECM_COE_ATTRIB_RS | ECM_COE_ATTRIB_RO)) {
-                    printf("(R");
+                    fprintf(ECMlogFile,"(R");
             } else {
-                printf("( ");
+                fprintf(ECMlogFile,"( ");
             }
             if (pEntryDesc->usObjectAccess &
                 (ECM_COE_ATTRIB_WP | ECM_COE_ATTRIB_WS | ECM_COE_ATTRIB_WO)) {
-                    printf("W");
+                    fprintf(ECMlogFile,"W");
             } else {
-                printf(" ");
+                fprintf(ECMlogFile," ");
             }
             if (pEntryDesc->usObjectAccess & (ECM_COE_ATTRIB_RX | ECM_COE_ATTRIB_TX)) {
-                printf("M");
+                fprintf(ECMlogFile,"M");
             } else {
-                printf(" ");
+                fprintf(ECMlogFile," ");
             }
             if (pEntryDesc->usObjectAccess & ECM_COE_ATTRIB_BU) {
-                printf("B");
+                fprintf(ECMlogFile,"B");
             } else {
-                printf(" ");
+                fprintf(ECMlogFile," ");
             }
             if (pEntryDesc->usObjectAccess & ECM_COE_ATTRIB_ST) {
-                printf("S");
+                fprintf(ECMlogFile,"S");
             } else {
-                printf(" ");
+                fprintf(ECMlogFile," ");
             }
-            printf(") ");
+            fprintf(ECMlogFile,") ");
 
             /* Read the current value of this entry */
             mboxHead.coe.usIndex    = pOdList->usIndex[i];
@@ -2360,87 +2359,87 @@ static void ecmTestCoeScan(ECM_HANDLE hndSlave)
             szBuffer                = sizeof(buffer);
             result = ecmCoeSdoUpload(hndSlave, &mboxHead, buffer, &szBuffer);
             if (result != ECM_SUCCESS) {
-                printf("SDO upload error %s", ecmResultToString(result));
+                fprintf(ECMlogFile,"SDO upload error %s", ecmResultToString(result));
                 if ((mboxHead.coe.ucFlags & ECM_COE_FLAG_ABORT_CODE) != 0) {
-                    printf(" (Abort code: 0x%08lx)", *(unsigned long *)buffer);
+                    fprintf(ECMlogFile," (Abort code: 0x%08lx)", *(unsigned long *)buffer);
                 }
-                printf("\n");
+                fprintf(ECMlogFile,"\n");
                 continue;
             }
 
             /* Print the result (All data is little endian !!)*/
-            printf("Data = ");
+            fprintf(ECMlogFile,"Data = ");
             switch(pEntryDesc->usDataType)
             {
             case ECM_COE_TYP_BOOLEAN:
-                printf("%s", (*(uint8_t *)buffer & 0x1) ? "TRUE" : "FALSE");
+                fprintf(ECMlogFile,"%s", (*(uint8_t *)buffer & 0x1) ? "TRUE" : "FALSE");
                 break;
             case ECM_COE_TYP_INT8:
             case ECM_COE_TYP_UINT8:
-                printf("%02x", *(uint8_t *)buffer);
+                fprintf(ECMlogFile,"%02x", *(uint8_t *)buffer);
                 break;
             case ECM_COE_TYP_INT16:
             case ECM_COE_TYP_UINT16:
                 ecmCpuToLe(&usTemp, buffer, (const uint8_t *)"\x02\0");
-                printf("%04x", usTemp);
+                fprintf(ECMlogFile,"%04x", usTemp);
                 break;
             case ECM_COE_TYP_INT32:
             case ECM_COE_TYP_UINT32:
                 ecmCpuToLe(&ulTemp, buffer, (const uint8_t *)"\x04\0");
-                printf("%08lx", (unsigned long)ulTemp);
+                fprintf(ECMlogFile,"%08lx", (unsigned long)ulTemp);
                 break;
             case ECM_COE_TYP_VIS_STRING:
                 buffer[szBuffer] = '\0';
-                printf("%s", buffer);
+                fprintf(ECMlogFile,"%s", buffer);
                 break;
             default:
-                printf("Unsupported");
+                fprintf(ECMlogFile,"Unsupported");
                 break;
             } /* of switch */
 
-            printf("\n");
+            fprintf(ECMlogFile,"\n");
 
             /* Print (optional) unit definition */
             pucData = ECM_COE_ENTRY_UNIT(pEntryDesc);
             if (pucData != NULL) {
-                printf("     Unit = 0x");
+                fprintf(ECMlogFile,"     Unit = 0x");
                 for (k = 0; k < 4; k++) {
-                    printf("%02x", *pucData++);
+                    fprintf(ECMlogFile,"%02x", *pucData++);
                 }
-                printf("\n");
+                fprintf(ECMlogFile,"\n");
             }
 
             /* Print (optional) default value definition */
             pucData = ECM_COE_ENTRY_DEFAULT_VALUE(pEntryDesc);
             if (pucData != NULL) {
-                printf("     Default Value = 0x");
+                fprintf(ECMlogFile,"     Default Value = 0x");
                 for (k = 0; k < ECM_DATA_BYTES(pEntryDesc->usBitLen); k++) {
-                    printf("%02x", *pucData++);
+                    fprintf(ECMlogFile,"%02x", *pucData++);
                 }
-                printf("\n");
+                fprintf(ECMlogFile,"\n");
             }
 
             /* Print (optional) min value definition */
             pucData = ECM_COE_ENTRY_MIN_VALUE(pEntryDesc);
             if (pucData != NULL) {
-                printf("     Min Value = 0x");
+                fprintf(ECMlogFile,"     Min Value = 0x");
                 for (k = 0; k < ECM_DATA_BYTES(pEntryDesc->usBitLen); k++) {
-                    printf("%02x", *pucData++);
+                    fprintf(ECMlogFile,"%02x", *pucData++);
                 }
-                printf("\n");
+                fprintf(ECMlogFile,"\n");
             }
 
             /* Print (optional) max value definition */
             pucData = ECM_COE_ENTRY_MAX_VALUE(pEntryDesc);
             if (pucData != NULL) {
-                printf("     Max Value = 0x");
+                fprintf(ECMlogFile,"     Max Value = 0x");
                 for (k = 0; k < ECM_DATA_BYTES(pEntryDesc->usBitLen); k++) {
-                    printf("%02x", *pucData++);
+                    fprintf(ECMlogFile,"%02x", *pucData++);
                 }
-                printf("\n");
+                fprintf(ECMlogFile,"\n");
             }
 
-            printf("  %s\n", ECM_COE_ENTRY_NAME(pEntryDesc));
+            fprintf(ECMlogFile,"  %s\n", ECM_COE_ENTRY_NAME(pEntryDesc));
         } /* for j */
     } /* for i */
 
@@ -2472,7 +2471,7 @@ static int DoEcatIo(ECM_HANDLE hndDevice)
       result = ecmProcessInputData(hndDevice);
   }
   if (result != ECM_SUCCESS) {
-      printf("I/O (1) error %s\n", ecmResultToString(result));
+      fprintf(ECMlogFile,"I/O (1) error %s\n", ecmResultToString(result));
   }
 
   /* Call the I/O handler (which might also do the asynchronous communication) */
@@ -2485,7 +2484,7 @@ static int DoEcatIo(ECM_HANDLE hndDevice)
       result = ecmProcessOutputData(hndDevice);
   }
   if (result != ECM_SUCCESS) {
-      printf("I/O (1) error %s\n", ecmResultToString(result));
+      fprintf(ECMlogFile,"I/O (1) error %s\n", ecmResultToString(result));
   }
 
   /* Call end of cycle handler */
@@ -2516,14 +2515,14 @@ static int ChangeEcatState(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster,
         /* Wait for OPERATIONAL if we have worker tasks */
         result = ecmRequestState(hndMaster, usState, 150000);
         if (result != ECM_SUCCESS) {
-            printf("Failed with %s to change network state into state %d !\n", ecmResultToString(result), usState);
+            fprintf(ECMlogFile,"Failed with %s to change network state into state %d !\n", ecmResultToString(result), usState);
         }
         return (result);
     } else {
         /* Request state without waiting for completion */
         result = ecmRequestState(hndMaster, ECM_DEVICE_STATE_OP, 0);
         if (result != ECM_SUCCESS) {
-            printf("Failed to change network state into operational !\n");
+            fprintf(ECMlogFile,"Failed to change network state into operational !\n");
             return (result);
         }
 
@@ -2536,7 +2535,7 @@ static int ChangeEcatState(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster,
             /* Get current network state */
             result = ecmGetState(hndMaster, &usActState);
             if (result != ECM_SUCCESS) {
-                printf("Failed to get network state ! (%s)\n", ecmResultToString(result));
+                fprintf(ECMlogFile,"Failed to get network state ! (%s)\n", ecmResultToString(result));
                 return (-1);
             }
 
@@ -2568,7 +2567,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pDevState);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable DevState\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable DevState\n");
         }
     }
 
@@ -2584,7 +2583,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pSlaveCount);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable SlaveCount\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable SlaveCount\n");
         }
     }
 
@@ -2594,7 +2593,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pSlaveCount2);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable SlaveCount2\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable SlaveCount2\n");
         }
     }
 
@@ -2603,7 +2602,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pSlaveCount);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable SlaveCount\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable SlaveCount\n");
         }
     }
 
@@ -2612,7 +2611,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pSlaveCount2);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable SlaveCount2\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable SlaveCount2\n");
         }
     }
 
@@ -2623,7 +2622,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pWcState);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable WcState\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable WcState\n");
         }
     }
 
@@ -2636,7 +2635,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         result = ecmGetDataReference(hndMaster, ECM_OUTPUT_DATA,
             VarDesc.ulBitOffs / 8, 2, (void **)&pucDio);
         if (result != ECM_SUCCESS) {
-            printf("Failed to get reference to virtual variable Output\n");
+            fprintf(ECMlogFile,"Failed to get reference to virtual variable Output\n");
         }
     }
 
@@ -2655,7 +2654,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		result = ecmGetDataReference(hndMaster, ECM_OUTPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio);
 		if (result != ECM_SUCCESS) {
-			printf("Failed to get reference to Controlword Output\n");
+			fprintf(ECMlogFile,"Failed to get reference to Controlword Output\n");
 		}
 	}
 
@@ -2666,7 +2665,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		result = ecmGetDataReference(hndMaster, ECM_OUTPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_OperationMode);
 		if (result != ECM_SUCCESS) {
-			printf("Failed to get reference to Controlword Output\n");
+			fprintf(ECMlogFile,"Failed to get reference to Controlword Output\n");
 		}
 	}
 
@@ -2678,7 +2677,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&	pucDio_TargetPosition
 		);
 		if (result != ECM_SUCCESS) {
-			printf("Failed to get reference to Controlword Output\n");
+			fprintf(ECMlogFile,"Failed to get reference to Controlword Output\n");
 		}
 	}
 
@@ -2690,7 +2689,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&	pucDio_TargetVelocity
 		);
 		if (result != ECM_SUCCESS) {
-			printf("Failed to get reference to Controlword Output\n");
+			fprintf(ECMlogFile,"Failed to get reference to Controlword Output\n");
 		}
 	}
 
@@ -2778,16 +2777,16 @@ static int ecmEventHandler(ECM_EVENT *pEvent)
                     (unsigned long)pEvent->ulArg2);
             break;
         case ECM_EVENT_CFG_MEMORY:
-            printf("Out of memory parsing line %lu\n",
+			printf("Out of memory parsing line %lu\n",
                     (unsigned long)pEvent->ulArg2);
             break;
         case ECM_EVENT_CFG_IO:
-            printf("Input buffer I/O error\n");
+			printf("Input buffer I/O error\n");
             break;
         case ECM_EVENT_CFG_SYNTAX:
             ecmFormatError(ECM_ENI_ERROR_REASON(pEvent->ulArg2),                                        ECM_ERROR_ENI_PARSER_ERROR_CODE, szBuffer,
                            sizeof(szBuffer));
-            printf("Parse error at line %lu of ENI file: %s\n",
+			printf("Parse error at line %lu of ENI file: %s\n",
                    (unsigned long)ECM_ENI_ERROR_LINE(pEvent->ulArg2),
                    szBuffer);
             break;
@@ -2800,18 +2799,18 @@ static int ecmEventHandler(ECM_EVENT *pEvent)
              */
             break;
         case ECM_EVENT_CFG_PARAMETER:
-            printf("Error processing ENI element text in line %lu\n",
+			printf("Error processing ENI element text in line %lu\n",
                    (unsigned long)pEvent->ulArg2);
             break;
         case ECM_EVENT_CFG_CYCLE_TIME:
-            printf("Inconsistent cycle time definitions");
+			printf("Inconsistent cycle time definitions");
             if(pEvent->ulArg2 != 0) {
-                printf("for slave %4x", pEvent->ulArg2);
+				printf("for slave %4x", pEvent->ulArg2);
             }
-            printf("\n");
+			printf("\n");
             break;
         default:
-            printf("Unhandled configuration event 0x%lx\n", (unsigned long)pEvent->ulEvent);
+			printf("Unhandled configuration event 0x%lx\n", (unsigned long)pEvent->ulEvent);
             break;
         }
         break;
@@ -2823,55 +2822,55 @@ static int ecmEventHandler(ECM_EVENT *pEvent)
                 (unsigned long)ulFlagSet, (unsigned long)ulFlagReset);
 #endif
         if(ulFlagSet != 0) {
-            printf("+ (");
+			printf("+ (");
             ecmTestEventToString(ulFlagSet);
-            printf(")\n");
+			printf(")\n");
         }
 
         if(ulFlagReset != 0) {
-            printf("- (");
+			printf("- (");
             ecmTestEventToString(ulFlagReset);
-            printf(")\n");
+			printf(")\n");
         }
 
         break;
     case ECM_EVENT_WCNT:
-        printf("WC error (%08lx) in frame %lu\n",
+		printf("WC error (%08lx) in frame %lu\n",
                 (unsigned long)pEvent->ulArg1, (unsigned long)pEvent->ulArg2);
         break;
     case ECM_EVENT_STATE_CHANGE:
-        printf("Master state change to ");
+		printf("Master state change to ");
         switch(pEvent->ulArg1)
         {
         case ECM_DEVICE_STATE_UNKNOWN:
-            printf("UNKNOWN\n");
+			printf("UNKNOWN\n");
             break;
         case ECM_DEVICE_STATE_INIT:
-            printf("INIT\n");
+			printf("INIT\n");
             break;
         case ECM_DEVICE_STATE_PREOP:
-            printf("PREOP\n");
+			printf("PREOP\n");
             break;
         case ECM_DEVICE_STATE_SAFEOP:
-            printf("SAFEOP\n");
+			printf("SAFEOP\n");
             break;
         case ECM_DEVICE_STATE_OP:
-            printf("OP\n");
+			printf("OP\n");
             break;
         default:
-            printf("???\n");
+			printf("???\n");
             break;
         }
         break;
     case ECM_EVENT_SLV:
-        printf("Slave %04lu: State ", (unsigned long)pEvent->ulArg2);
+		printf("Slave %04lu: State ", (unsigned long)pEvent->ulArg2);
         switch (pEvent->ulArg1 & 0xF)
         {
         case ECM_ESC_AL_STATUS_INIT:
-            printf("INIT");
+			printf("INIT");
             break;
         case ECM_ESC_AL_STATUS_PREOP:
-            printf("PREOP");
+			printf("PREOP");
             break;
         case ECM_ESC_AL_STATUS_BOOTSTRAP:
             printf("BOOTSTRAP");
@@ -2955,7 +2954,7 @@ static int ecmEventHandler(ECM_EVENT *pEvent)
 #if defined(_WIN32)
 static int ecmTestAdjustClock(int32_t lDelta, uint32_t ulPeriod)
 {
-    printf("Delta: %ld ns (%uld us)\n", lDelta, ulPeriod);
+    fprintf(ECMlogFile,"Delta: %ld ns (%uld us)\n", lDelta, ulPeriod);
     return(0);
 }
 #endif
@@ -2969,7 +2968,7 @@ static void ecmTestDcMonitoring(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster)
     ECM_DEVICE_STATE stateDev;
 
     if (ECM_SUCCESS == ecmGetMasterState(hndMaster, NULL, &state)) {
-        printf(" DC drift: %d ns / SM<->SYNC0: %d ns / SYNC Window: %d ns\n",
+        fprintf(ECMlogFile," DC drift: %d ns / SM<->SYNC0: %d ns / SYNC Window: %d ns\n",
             (int)state.lDeviation, (int)state.lSmToSync0Delay,
             (int)state.ulDcSysTimeDiff);
     }
@@ -2986,7 +2985,7 @@ static void ecmTestDcMonitoring(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster)
             time_t unixTime;
             uint64_t ullSysTime;
 
-            printf(" DC time : ");
+            fprintf(ECMlogFile," DC time : ");
             ullSysTime = (uint64_t)stateDev.ulDcRefClockHigh << 32 |
                 (uint64_t)stateDev.ulDcRefClockLow;
 
@@ -2994,28 +2993,651 @@ static void ecmTestDcMonitoring(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster)
             unixTime = (time_t)lTime;
             strftime(cBuffer, sizeof(cBuffer),
                 "%y/%m/%d - %X", gmtime(&unixTime));
-            printf("%s", cBuffer);
+            fprintf(ECMlogFile,"%s", cBuffer);
             unixTime = time(NULL);
             strftime(cBuffer, sizeof(cBuffer)," (%X)\n", gmtime(&unixTime));
-            printf("%s", cBuffer);
+            fprintf(ECMlogFile,"%s", cBuffer);
         }
     }
 
     return;
 }
 
+CecmTest::CecmTest() {
 
-DWORD WINAPI emcThreadFunction(LPVOID lpParam) {
+	//Open log file with writting permissions
+	ECMlogFile = fopen(cECMlogFile, "w");
+	//pFile = fopen("C:\\workspace\\Base_project_Master_Config_sample.xml", "r");
+	if (ECMlogFile != NULL)
+	{
+		fprintf(ECMlogFile, "Creating log file %s\n", cECMlogFile);
+		fflush(ECMlogFile);
+	}
+
+
+}
+
+CecmTest::~CecmTest() {
+	//TODO
+	fclose(ECMlogFile);
+
+}
+
+int CecmTest::Init(int argc, char *argv[])
+{
+	ECM_VERSION  ecmVersion;
+	ECM_LIB_INIT libInitData;
+	ECM_HANDLE   hndDevice, hndMaster, hndSlave;
+	ECM_ETHERNET_ADDRESS macPrimary, macRedundant;
+	ECM_CFG_INIT cfgInitData;
+	const char   *pszArchiveFile, *pszEniFile = NULL;
+	int i, j, result;
+	uint32_t numAdapter;
+	PECM_NIC pNicList;
+	ECM_PROC_CTRL ProcCtrl;
+	ECM_MASTER_STATE masterState;
+
+	/* Print the startup banner */
+	fprintf(ECMlogFile, "EtherCAT master test application V%d.%d.%d\n",
+		ECM_TEST_MAJOR, ECM_TEST_MINOR, ECM_TEST_BUILD);
+	fprintf(ECMlogFile, "(c) 2008-2015 esd electronic system design gmbh\n\n");
+	fflush(ECMlogFile);
+
+	/* Parse the command line arguments and adjust args to last argument */
+	ParseCommandLine(argc, argv);
+
+	argc -= optind;
+	argv += optind;
+
+	/* OS dependent initialization of the runtime environment */
+	result = ecmTestInit(&libInitData);
+	if (result != 0) {
+		fprintf(ECMlogFile,"ecmTestInit() returned with %d\n", result);
+		return(-1);
+	}
+
+	/* Initialization of master library */
+	libInitData.ulEventMask = g_ulEventMask;
+	libInitData.ulEventMask |= ECM_EVENT_REMOTE;
+	libInitData.pfnEventHandler = ecmEventHandler;
+	libInitData.ulDbgMask = g_ulDebugMask;
+	result = ecmInitLibrary(&libInitData);
+	if (result != ECM_SUCCESS) {
+		fprintf(ECMlogFile,"Initializing master stack failed with %s\n",
+			ecmResultToString(result));
+		(void)ecmTestCleanup();
+		return(-1);
+	}
+
+	/* Make of copy of the high resolution counter frequency */
+	g_ulCyclesPerSec = (uint32_t)libInitData.ullCyclesPerSec;
+
+	/* Print revision of master modules and validate ABI */
+	ecmVersion.usVersionMaster = (ECM_LEVEL << 12) | (ECM_REVI << 8) | ECM_BUILD;
+	if (ecmGetVersion(&ecmVersion) != ECM_SUCCESS) {
+		fprintf(ECMlogFile,"Getting EtherCAT master version information failed\n");
+		(void)ecmTestCleanup();
+		return(-1);
+	}
+	if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_VERSION) != 0) {
+		PrintVersionInformation(&ecmVersion);
+	}
+
+	/* Get number of available NICs */
+	if (ecmGetNicList(NULL, &numAdapter) != ECM_SUCCESS) {
+		fprintf(ECMlogFile,"Getting number of available adapter failed\n");
+		(void)ecmTestCleanup();
+		return(-1);
+	}
+	else {
+		pNicList = (PECM_NIC)calloc(numAdapter, sizeof(ECM_NIC));
+		if (pNicList != NULL) {
+			ecmGetNicList(pNicList, &numAdapter);
+			if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
+				fprintf(ECMlogFile,"\nAvailable NICs for EtherCAT\n");
+				fprintf(ECMlogFile,"---------------------------\n");
+			}
+			for (i = 0; i < (int)numAdapter; i++) {
+				if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
+					fprintf(ECMlogFile,"%d. %s\n   MAC: %02x.%02x.%02x.%02x.%02x.%02x\n",
+						i, pNicList[i].szName,
+						pNicList[i].macAddr.b[0], pNicList[i].macAddr.b[1],
+						pNicList[i].macAddr.b[2], pNicList[i].macAddr.b[3],
+						pNicList[i].macAddr.b[4], pNicList[i].macAddr.b[5]);
+				}
+				if (iPrimaryNic == i) {
+					ECM_INIT_MAC(macPrimary, pNicList[i].macAddr);
+				}
+				if (iRedundantNic == i) {
+					ECM_INIT_MAC(macRedundant, pNicList[i].macAddr);
+				}
+			}
+			free(pNicList);
+		}
+	}
+
+	/* Start remote server */
+	if ((ulConfigFlags & ECM_TEST_FLAG_REMOTE_SERVER) != 0) {
+		uint32_t ulFlags;
+
+		fprintf(ECMlogFile,"Start remote server (%s) in ", g_szChannelDescription);
+		if ((ulConfigFlags & ECM_TEST_FLAG_REMOTE_MONITOR) != 0) {
+			ulFlags = ECM_FLAG_REMOTE_MONITOR_MODE;
+			fprintf(ECMlogFile,"monitoring mode ...\n");
+		}
+		else {
+			ulFlags = ECM_FLAG_REMOTE_CONTROL_MODE;
+			fprintf(ECMlogFile,"control mode ...\n");
+		}
+		ECM_SET_REMOTE_SERVER_PRIO(ulFlags, PRIO_REMOTE);
+		ECM_SETUP_REMOTE_WATCHDOG(ulFlags, 5);
+		result = ecmStartRemotingServer(g_szChannelDescription, ulFlags);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile," - Failed with %s\n", ecmResultToString(result));
+			(void)ecmTestCleanup();
+			return(-1);
+		}
+	}
+
+	/* Clear the init data structure */
+	ECM_INIT(cfgInitData);
+
+	/* Check if ENI file is defined */
+	if (argc != 1) {
+		PrintUsage();
+		(void)ecmTestCleanup();
+		return(0);
+	}
+	else {
+		/* Get ENI configuration file and (optional) archive file */
+		pszEniFile = strtok(argv[0], "@");
+		pszArchiveFile = strtok(NULL, "@");
+		/* Return without configuration file */
+		if (NULL == pszEniFile) {
+			fprintf(ECMlogFile,"No EtherCAT network configuration specified\n");
+			(void)ecmTestCleanup();
+			return(-1);
+		}
+
+		/* Get configuration data either from file or from memory */
+		if (0 == (ulConfigFlags & ECM_TEST_FLAG_MEMORY_CONFIG)) {
+			cfgInitData.Config.File.pszEniFile = pszEniFile;
+			cfgInitData.Config.File.pszArchiveFile = pszArchiveFile;
+			if (strlen(g_szPassword) > 0) {
+				cfgInitData.Config.File.pszPassword = g_szPassword;
+			}
+		}
+		else {
+			result = ReadConfigFileIntoMemory(pszArchiveFile ? pszArchiveFile : pszEniFile,
+				(void **)&cfgInitData.Config.Buffer.pAddress,
+				&cfgInitData.Config.Buffer.size);
+			if (result != 0) {
+				free((void *)cfgInitData.Config.Buffer.pAddress);
+				(void)ecmTestCleanup();
+				return(-1);
+			}
+			cfgInitData.ulFlags = ECM_FLAG_CFG_PARSE_BUFFER;
+			cfgInitData.Config.Buffer.pszEniFile = pszEniFile;
+			if (strlen(g_szPassword) > 0) {
+				cfgInitData.Config.Buffer.pszPassword = g_szPassword;
+			}
+		}
+
+		/* Indicate compressed configuration */
+		if (pszArchiveFile != NULL) {
+			cfgInitData.ulFlags |= ECM_FLAG_CFG_COMPRESSED;
+		}
+	} /* of if (argc != 1) */
+
+
+	/* Store parser status in MSB of payload from ECM_EVENT_CFG_SYNTAX */
+	cfgInitData.ulFlags |= ECM_FLAG_CFG_ENI_ERR_REASON;
+
+	/* Copy the VLAN TCI */
+	cfgInitData.cfgDataMaster.vlanTCI = g_usVlanTci;
+
+	/* Define virtual port descriptor for EoE */
+	/* cfgInitData.cfgDataDevice.ucVport = 2; */
+
+	/* Mark master instance as monitored instance in remote monitoring mode */
+	if ((ulConfigFlags & ECM_TEST_FLAG_REMOTE_MONITOR) != 0) {
+		cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_REMOTE_INSTANCE;
+	}
+
+	/* Overwrite MAC of configuration file with own adapter MAC */
+	cfgInitData.ulFlags |= ECM_FLAG_CFG_IGNORE_SRC_MAC;
+	ECM_INIT_MAC(cfgInitData.cfgDataDevice.macAddr[ECM_NIC_PRIMARY], macPrimary);
+	if ((ulConfigFlags & ECM_TEST_FLAG_REDUNDANCY) != 0) {
+		cfgInitData.cfgDataDevice.ulFlags |= ECM_FLAG_DEVICE_REDUNDANCY;
+		ECM_INIT_MAC(cfgInitData.cfgDataDevice.macAddr[ECM_NIC_REDUNDANT],
+			macRedundant);
+	}
+	/* Use EtherCAT via UDP */
+	if ((ulConfigFlags & ECM_TEST_FLAG_UDP) != 0) {
+		cfgInitData.cfgDataDevice.ulFlags |= ECM_FLAG_DEVICE_UDP;
+	}
+
+	/* Do not include I/O time profiling ECM_PROFILE_CYCLIC_WORKER */
+	if (g_ulProfileMask & ECM_TEST_PROF_MODE_NO_IO_TIME) {
+		cfgInitData.cfgDataDevice.ulFlags |= ECM_FLAG_DEVICE_PROFILE_NO_IO;
+	}
+
+	/* Use destination MAC of ENI file instead of broadcast */
+	if ((ulConfigFlags & ECM_TEST_FLAG_NO_BROADCAST) != 0) {
+		cfgInitData.ulFlags |= ECM_FLAG_CFG_USE_DST_MAC;
+	}
+
+	/* Enable optimized cyclic frames */
+	if ((ulConfigFlags & ECM_TEST_FLAG_REDUCE_CYCLIC_FRM) != 0) {
+		cfgInitData.ulFlags |= ECM_FLAG_CFG_REDUCE_FRAMES;
+	}
+
+	/* Setup number of cycles after NIC link state is checked */
+	cfgInitData.cfgDataDevice.usCycleLinkState = 50;
+
+	/* Setup number of cycles after watchdog is triggered */
+	cfgInitData.cfgDataDevice.usCycleWatchdog = 0;    /* 50; */
+
+	/* Limit # of acyclic frames per I/O cycle */
+	cfgInitData.cfgDataDevice.usAcycCtrl = g_usAcycCtrl;
+
+	/* Use configured destination MAC instead of broadcast */
+	if ((ulConfigFlags & ECM_TEST_FLAG_FORCE_DST_ADDR) != 0) {
+		ECM_INIT_MAC(cfgInitData.cfgDataMaster.macAddr, g_DstMac);
+		cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DST_ADDR_VALID;
+	}
+
+	/* Use the stack for process data */
+	cfgInitData.cfgDataMaster.pInput = &ucInputBuffer;
+	cfgInitData.cfgDataMaster.ulSzInput = sizeof(ucInputBuffer);
+	cfgInitData.cfgDataMaster.pOutput = &ucOutputBuffer;
+	cfgInitData.cfgDataMaster.ulSzOutput = sizeof(ucOutputBuffer);
+
+	/* Setup DC configuration if enabled */
+	if ((ulConfigFlags & ECM_TEST_FLAG_USE_DC) != 0) {
+		cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DC;
+		if ((ulConfigFlags & ECM_TEST_FLAG_DC_DRIFT_COMP) != 0) {
+			cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DC_RESYNC;
+		}
+		cfgInitData.cfgDataMaster.ucDcSysTimeEpoch = g_ucDcSysTimeEpoch;
+		/*
+		 * Enable master clock synchronization if configured and set the
+		 * configured parameter for control loop and local DC shift.
+		 */
+		if ((ulConfigFlags & ECM_TEST_FLAG_DCM_CLOCK_SHIFT) != 0) {
+			cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DCM_CLOCK_SHIFT;
+			cfgInitData.cfgDataMaster.sDcUserShift = g_sUserShiftMaster;
+			cfgInitData.cfgDataDevice.usCycleDcCtrl = g_usDcClockControl;
+		}
+	}
+
+
+	/* Enable slave monitoring support */
+	if ((ulConfigFlags & ECM_TEST_FLAG_SLAVE_STATUS) != 0) {
+		cfgInitData.ulFlags |= (ECM_FLAG_CFG_DIAG_STATUS |
+			ECM_FLAG_CFG_DIAG_ERRCNT);
+		cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DIAG;
+	}
+
+	/* Set alignment to 4 */
+	cfgInitData.cfgDataMaster.ucAlignment = 4;
+
+	/* Say: Support virtual variables and keep process variable description */
+	cfgInitData.ulFlags |= ECM_FLAG_CFG_VIRTUAL_VARS |
+		ECM_FLAG_CFG_KEEP_PROCVARS;
+
+	/* Say: Want to create device and master */
+	hndDevice = ECM_INVALID_HANDLE;
+
+	//EF modifications
+	FILE * pFile;
+	pFile = fopen(argv[0], "r");
+	//pFile = fopen("C:\\workspace\\Base_project_Master_Config_sample.xml", "r");
+	if (pFile != NULL)
+	{
+		fprintf(ECMlogFile, "ENI configuration file selected: %s\n", argv[0]);
+		fclose(pFile);
+	}
+	//-----------------
+
+	/* Create configuration based on ENI configuration file */
+	result = ecmReadConfiguration(&cfgInitData, &hndDevice, &hndMaster);
+	/* Free resources if configuration is stored in memory */
+	if ((ulConfigFlags & ECM_TEST_FLAG_MEMORY_CONFIG) != 0) {
+		free((void *)cfgInitData.Config.Buffer.pAddress);
+	}
+	if (result != ECM_SUCCESS) {
+		fprintf(ECMlogFile,"Reading configuration failed with %s\n", ecmResultToString(result));
+		(void)ecmTestCleanup();
+		return(result);
+	}
+
+	/*
+	 * Cycle time precedence:
+	 *      1. Command line parameter
+	 *      2. esd EtherCAT Workbench specific keyword <CycleTime>
+	 *      3. Default cycle time
+	 */
+	if (0 == g_ulCycleTime) {
+		if (0 == cfgInitData.cfgDataDevice.ulCycleTime) {
+			g_ulCycleTime = ECM_TEST_DEFAULT_CYCLE_TIME;
+		}
+		else {
+			g_ulCycleTime = cfgInitData.cfgDataDevice.ulCycleTime;
+		}
+	}
+
+	/*
+	 * In case of cyclic handler jitter check without allowed absolute value
+	 * use 10 percent of configured cycle time as threshold for an indication.
+	 */
+	if ((ulConfigFlags & ECM_TEST_FLAG_CHECK_JITTER) != 0) {
+		if (0 == g_ulCycleTimeViolation) {
+			g_ulCycleTimeViolation = g_ulCycleTime / 10;
+		}
+		g_ulCycleTimeViolation += g_ulCycleTime;
+	}
+
+	/* Print device description */
+	bool printInfoToFile = false;
+	if (printInfoToFile) {
+		//fflush(ECMlogFile);
+		printf("Device:\n-------\n");
+		PrintDeviceDescription(hndDevice);
+
+		/* Print master description */
+		//fflush(ECMlogFile);
+		printf("Master:\n-------\n");
+		PrintMasterDescription(hndMaster);
+
+		/* Iterate list of slaves */
+		//fflush(ECMlogFile);
+		printf("Slaves:\n-------\n");
+		for (hndSlave = hndMaster; hndSlave;) {
+			if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
+				break;
+			}
+
+			/* Print slave description */
+			PrintSlaveDescription(hndSlave);
+		}
+
+		/* Print the list of process variables (defined in ENI file) */
+		PrintVarList(hndMaster);
+
+		/* Print copy vector */
+		PrintCopyVector(hndMaster);//EF mod
+
+		/* Print statistic information */
+		PrintStatistic(hndDevice, hndMaster);
+	}
+	/* Setup reference to variables before attaching the master */
+	ecmTestSetupProcesData(hndMaster);
+
+	/* Attach the master to the device */
+	result = ecmAttachMaster(hndMaster);
+	if (result != ECM_SUCCESS) {
+		printf("Attaching master failed with %s\n", ecmResultToString(result));
+		ecmDeleteMaster(hndMaster);
+		ecmDeleteDevice(hndDevice);
+		(void)ecmTestCleanup();
+		return(-1);
+	}
+
+	ecmSleep(1000);
+
+	/* Reset error handling in cyclic handler */
+	CycleHandlerErrorMessage(ECM_SUCCESS, ECM_TEST_CYCLIC_HANDLER);
+	CycleHandlerErrorMessage(ECM_SUCCESS, ECM_TEST_CYCLIC_START_HANDLER);
+	CycleHandlerErrorMessage(ECM_SUCCESS, ECM_TEST_CYCLIC_END_HANDLER);
+
+	/* Setup background worker tasks parameter */
+	ECM_INIT(ProcCtrl);
+	if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_ACYC_WORKER)) {
+		ProcCtrl.ulAcyclicPeriod = 1000;
+		ProcCtrl.ulAcyclicPrio = PRIO_ACYCLIC;
+	}
+	if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER)) {
+		ProcCtrl.ulCyclicPeriod = g_ulCycleTime;
+		ProcCtrl.ulCyclicPrio = PRIO_CYCLIC;
+		ProcCtrl.pfnHandler = CycleHandler;
+		ProcCtrl.pfnBeginCycle = CycleStartHandler;
+		ProcCtrl.pfnEndCycle = CycleEndHandler;
+		/* Configure I/O processing order */
+		if ((g_ulIoMode & ECM_TEST_IO_MODE_TX_BEFORE_RX) != 0) {
+			ProcCtrl.ulFlags = ECM_FLAG_CTRL_OUT_BEFORE_IN;
+		}
+	}
+
+	result = ecmProcessControl(hndDevice, &ProcCtrl);
+	if (result != ECM_SUCCESS) {
+		printf("Creating background worker threads failed with %s\n",
+			ecmResultToString(result));
+		ecmDetachMaster(hndMaster);
+		ecmDeleteMaster(hndMaster);
+		ecmDeleteDevice(hndDevice);
+		(void)ecmTestCleanup();
+		return(-1);
+	}
+	else {
+		printf("Worker thread cycle times (microseconds) (Cyclic: %d / Acyclic %d)\n",
+			ProcCtrl.ulCyclicPeriod, ProcCtrl.ulAcyclicPeriod);
+	}
+
+	/* INIT -> OP loop */
+	do {
+		/* Wait some cycles */
+		ecmSleep(100);//EF mod, default value is 100 ms
+
+		/* Do some I/O using async services in INIT state */
+		PrintEscRegister(hndMaster);
+
+		/*
+		* Change EtherCAT network state to into OPERATIONAL.
+		*/
+		result = ChangeEcatState(hndDevice, hndMaster, ECM_DEVICE_STATE_OP);
+		if (result != ECM_SUCCESS) {
+			printf("Network failed to change into OPERATIONAL with %s!\n",
+				ecmResultToString(result));
+			ecmDetachMaster(hndMaster);
+			ecmDeleteMaster(hndMaster);
+			ecmDeleteDevice(hndDevice);
+			(void)ecmTestCleanup();
+			return(-1);
+		}
+
+		/*
+		* Validate if all configured slaves are present and OPERATIONAL
+		*/
+		result = ecmGetMasterState(hndMaster, NULL, &masterState);
+		if (result != ECM_SUCCESS) {
+			printf("Requesting master state failed with %s\n", ecmResultToString(result));
+		}
+		else {
+			if (masterState.usNumSlaves != masterState.usActiveSlaves) {
+				printf("Warning: Number of configured slaves (%d) "
+					"differ from active slaves (%d)\n",
+					masterState.usNumSlaves, masterState.usActiveSlaves);
+			}
+			if ((masterState.ulFlags & ECM_LOCAL_STATE_MASK) != 0) {
+				printf("Warning: Not all slaves changed into operational !!\n");
+			}
+		}
+
+		/* Scan and CoE object dictionary |SoE data elements */
+		if ((ulConfigFlags & ECM_TEST_FLAG_SCAN_DICTIONARY) != 0) {
+			/* Blocking operation not possible without cyclic worker task */
+			if ((g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER) != 0) {
+				printf("Blocking ESC access not supported without cyclic worker !\n");
+			}
+			else {
+				for (hndSlave = hndMaster; hndSlave;) {
+					ECM_SLAVE_DESC descSlave;
+
+					if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
+						break;
+					}
+					/* Gets slave state and do an object scan for CoE/SoE slaves */
+					result = ecmGetSlaveState(hndSlave, &descSlave, NULL);
+					if (result != ECM_SUCCESS) {
+						printf("Requesting slave description failed with %s\n",
+							ecmResultToString(result));
+						continue;
+					}
+					if ((descSlave.ulFlags & ECM_FLAG_SLAVE_COE) != 0) {
+						ecmTestCoeScan(hndSlave);
+						printf("\t\t-----------\n");
+						ecmSleep(1000);
+					}
+					else if ((descSlave.ulFlags & ECM_FLAG_SLAVE_SOE) != 0) {
+						ecmTestSoeScan(hndSlave);
+						ecmSleep(1000);
+					}
+				}
+			}
+		}
+
+		/* Initialize to request slave diagnostic data */
+		hndSlave = hndMaster;
+
+		/*
+		* Print device state and active slaves while running.
+		* Cyclic I/O data is handled in the callback handler
+		*/
+		for (i = 0; ; i++) {
+			uint16_t usData;
+
+			/* Check exit condition */
+			if ((g_lRuntime != 0) && i >= (int)g_lRuntime) {
+				break;
+			}
+
+			/* Print device state (virtual variable) */
+			if (pDevState != NULL) {
+				ecmCpuToLe(&usData, pDevState, (const uint8_t *)"\x2\x0");
+				printf("State: %04x", usData);
+			}
+			/* Print # of slaves on primary and redundant adapter */
+			if (pSlaveCount != NULL) {
+				ecmCpuToLe(&usData, pSlaveCount, (const uint8_t *)"\x2\x0");
+				printf(" / Pri: %d", usData);
+				if (pSlaveCount2 != NULL) {
+					ecmCpuToLe(&usData, pSlaveCount2, (const uint8_t *)"\x2\x0");
+					printf(" / Red: %d", usData);
+				}
+			}
+
+			/* Print WC state of 1st frame */
+			if (pWcState != NULL) {
+				ecmCpuToLe(&usData, pWcState, (const uint8_t *)"\x2\x0");
+				printf(" / Frm0WC: %04x", usData);
+			}
+
+			/* Request diagnostic data in round robin mode */
+			if ((ulConfigFlags & ECM_TEST_FLAG_SLAVE_STATUS) != 0) {
+				if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
+					hndSlave = hndMaster;
+				}
+				else {
+					ECM_SLAVE_DIAG diag;
+					diag.usControl = 0;
+					if (ECM_SUCCESS == ecmGetSlaveDiag(hndSlave, &diag)) {
+						printf(" Link lost (Slave %x): %d", diag.usAddr,
+							diag.counter.ucLostLinkErrorPort0);
+					}
+				}
+			}
+
+			printf("\n");
+
+			/* Optionally print DC statistic */
+			if ((ulConfigFlags & ECM_TEST_FLAG_USE_DC) != 0) {
+				ecmTestDcMonitoring(hndDevice, hndMaster);
+			}
+
+			/* If the background worker task is running we just wait and
+			* get called in our handler with each cycle. Without worker
+			* task we have to drive our own I/O cycle and call the handler
+			* in between.
+			*/
+			if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER)) {
+				ecmSleep(100);//EF mod, default is 1000 ms
+			}
+			else {
+				for (j = 0; j < 100; j++) {
+					DoEcatIo(hndDevice);
+					ecmSleep(10);
+				}
+			}
+
+			/* Print collected profiling data if configured */
+			if ((ulConfigFlags & ECM_TEST_FLAG_PROFILING) != 0) {
+				PrintProfilingData(hndDevice);
+			}
+		}
+
+		printf("Change state to INIT...\n");
+
+		/* Change EtherCAT state back to INIT */
+		result = ChangeEcatState(hndDevice, hndMaster, ECM_DEVICE_STATE_INIT);
+		if (result != ECM_SUCCESS) {
+			printf("Network failed to change into INIT ! (%s)\n",
+				ecmResultToString(result));
+			(void)ecmTestCleanup();
+			return(-1);
+		}
+
+		PrintStatistic(hndDevice, hndMaster);
+
+	} while (--g_lLoops > 0);
+
+	printf("Detaching master...\n");
+	result = ecmDetachMaster(hndMaster);
+	if (result != ECM_SUCCESS) {
+		printf("Failed with %s\n", ecmResultToString(result));
+	}
+
+	printf("Deleting master...\n");
+	result = ecmDeleteMaster(hndMaster);
+	if (result != ECM_SUCCESS) {
+		printf("Failed with %s\n", ecmResultToString(result));
+	}
+
+	fprintf(ECMlogFile,"Deleting device...\n");
+	result = ecmDeleteDevice(hndDevice);
+	if (result != ECM_SUCCESS) {
+		fprintf(stdout, "Failed with %s\n", ecmResultToString(result));
+	}
+
+	/* Terminate remote server thread if remote monitor mode is configured */
+	if ((ulConfigFlags & ECM_TEST_FLAG_REMOTE_MONITOR) != 0) {
+		fprintf(stdout, "Terminate remote server ...\n");
+		ecmStopRemotingServer();
+	}
+
+	(void)ecmTestCleanup();
+	fprintf(stdout, "End\n");
+
+	return 0;
+}
+
+DWORD WINAPI CecmTest::emcThreadFunction(LPVOID lpParam) {
 	
 	PMYDATA arg = (PMYDATA)lpParam;
 
-	main(arg->argc, arg->argv);
+
+	//old functional call for base version
+//	main(arg->argc, arg->argv);
+
+	//mod for compilation success while code is being modified but not finished yet
+	CecmTest test;
+	test.main(arg->argc, arg->argv);
 
 	return 0;
 }
 
 
-int main(int argc, char *argv[])
+int CecmTest::main(int argc, char *argv[])
 {
     ECM_VERSION  ecmVersion;
     ECM_LIB_INIT libInitData;
@@ -3030,7 +3652,7 @@ int main(int argc, char *argv[])
     ECM_MASTER_STATE masterState;
 
     /* Print the startup banner */
-    printf("EtherCAT master test application V%d.%d.%d\n",
+	printf("EtherCAT master test application V%d.%d.%d\n",
        ECM_TEST_MAJOR, ECM_TEST_MINOR, ECM_TEST_BUILD);
     printf("(c) 2008-2015 esd electronic system design gmbh\n\n");
 
@@ -3282,7 +3904,7 @@ int main(int argc, char *argv[])
 	//pFile = fopen("C:\\workspace\\Base_project_Master_Config_sample.xml", "r");
 	if (pFile != NULL)
 	{
-		fprintf(stdout, "ENI configuration file selected: %s\n", argv[0]);
+		fprintf(ECMlogFile, "ENI configuration file selected: %s\n", argv[0]);
 		fclose(pFile);
 	}
 	//-----------------
@@ -3637,11 +4259,11 @@ int main(int argc, char *argv[])
 
 			if (ECM_SUCCESS == ecmAsyncRequest(hndMaster, newCommands[i].cmdType, newCommands[i].address, newCommands[i].numBytes, pData, pucCnt))
 			{
-				//fprintf(stdout, "OK! Value BRD = 0x%04X\n", value);
+				//fprintf(ECMlogFile, "OK! Value BRD = 0x%04X\n", value);
 			}
 			else 
 			{
-				fprintf(stdout, "Error\n");
+				fprintf(ECMlogFile, "Error\n");
 			}
 
 			ecmAsyncRequest_cnt++;//increase value for next iteration
@@ -3673,7 +4295,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        printf("Change state to INIT...\n");
+        fprintf(ECMlogFile,"Change state to INIT...\n");
 
         /* Change EtherCAT state back to INIT */
         result = ChangeEcatState(hndDevice, hndMaster, ECM_DEVICE_STATE_INIT);
@@ -3716,6 +4338,79 @@ int main(int argc, char *argv[])
     printf("End\n");
 
     return 0;
+}
+
+void CecmTest::writePDRampSend(float fLoopTargetPos) {
+
+	//A ramp motion requires up to 7 consecutive commands
+	//1. Operation mode = 1
+	//2. Control word = 6
+	//3. Control word = 7
+	//4. Control word = 15
+	//5. Position target = X (read on other function)
+	//6. Control word = 31 (motion starts!)
+	//7. Control word = 15 (still mode) -> better wait until 'position target' is achieved
+}
+
+bool CecmTest::MotionFRampMode(float fLoopTargetPos) {
+
+	static uint8_t	ucData;
+	static uint64_t ucData64;
+	static uint8_t	ucData_OperationMode;	//Sets Operation Mode register value
+	static uint8_t	ucData_TargetPosition;	//Sets Position value
+	static uint32_t cycleCounter;
+
+	static BOOLEAN faul_reset_is_done = FALSE;//EF mod: To send a "RESET FAULT" just once
+
+	/*
+	//EF mod: Just another value in output data!
+	if (cycleCounter < 500) {
+
+		if (!faul_reset_is_done) {
+			ucData = 128;//128: Fault reset
+			faul_reset_is_done = TRUE;
+
+			// Set output data
+			if (0 == ucData_OperationMode) {
+				ucData_OperationMode = 1;//Sets Operation Mode once and forever: Profile Position mode
+			}
+
+			// Update output data in process image
+			if (pucDio_OperationMode != 0) {
+				*pucDio_OperationMode = ucData_OperationMode;//EF mod, this pointer must be 10 bytes offset to "pucDio" --> OK!
+			}
+		}
+		else {
+			ucData = 0;//0: default
+		}
+	}
+	else if (cycleCounter < 600) {
+		ucData = 6; //6: Shutdown 
+	}
+
+	else if (cycleCounter < 700) {
+		ucData = 7; //7: Switch on
+	}
+	else if (cycleCounter < 720) {
+		ucData = 15;//15: Switch on
+		//ucData_TargetPosition = 200;
+		if (*pucDio_TargetPosition == 0) {
+			//*pucDio_TargetPosition++ = ucData_TargetPosition;
+			*pucDio_TargetPosition = 0xD0;//LSB
+			*(pucDio_TargetPosition + 1) = 0x07;//MSB
+		}
+	}
+	else {
+
+		if (ucData == 31) {
+			ucData = 16;
+			return true;
+		}
+		ucData = 31;//ON! Motor should move now!
+	}
+	cycleCounter++;*/
+
+	return false;//Not finished yet!
 }
 
 /******************************************************************************/
@@ -3958,7 +4653,7 @@ static int ecmTestInit(ECM_LIB_INIT *pLibInit)
 
     /* Change priority class to high */
     if(!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)) {
-        printf("Failed to change priority call to HIGH with %d\n", GetLastError());
+        fprintf(ECMlogFile,"Failed to change priority call to HIGH with %d\n", GetLastError());
     }
 
     /* Comment out the code below for HW specific DC clock synchronization */
