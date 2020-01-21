@@ -495,11 +495,18 @@ static uint16_t *pDevState = NULL, *pWcState = NULL;
 
 /* Reference to process variables */
 static uint8_t *pucDio = NULL;
-//static uint8_t *pucDio2 = NULL;//EF mod, for testing purposes
 //EF mod: extra pointers
-static uint8_t *pucDio_OperationMode	= NULL;//EF mod, "Operation mode" pointer
-static uint8_t *pucDio_TargetPosition	= NULL;//EF mod, "Target position" pointer
-static uint8_t *pucDio_TargetVelocity	= NULL;//EF mod, "Target velocity" pointer
+//Writings to slave
+static uint8_t *pucDio_OperationMode	= NULL;//"Operation mode" pointer
+static uint8_t *pucDio_ControlWord		= NULL;//"Control Word" pointer
+static uint8_t *pucDio_TargetPosition	= NULL;//"Target position" pointer
+static uint8_t *pucDio_TargetVelocity	= NULL;//"Target velocity" pointer
+//Readings from slave
+static uint8_t *pucDio_StatusWord		= NULL;//"Status mode" pointer
+static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer
+static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer
+static uint8_t *pucDio_DisplayOperationMode = NULL;//"Operation mode display" pointer
+static uint8_t *pucDio_PrimareTemperature	= NULL;//"Primary temperature value" pointer
 
 /*********************************************************************/
 /*                   FORWARD DECLARATIONS                            */
@@ -512,6 +519,8 @@ static int ecmTestCleanup(void);
 //FILE log
 FILE * ECMlogFile;
 const char * cECMlogFile = "logFile.txt";
+
+
 
 /*
  * Print usage information
@@ -1032,18 +1041,18 @@ static int CycleHandler(ECM_HANDLE hndDevice, int error)
 
 
 	//EF mod: Just another value in output data!
-	if (cycleCounter < 500) {
+/*	if (cycleCounter < 500) {
 
 		if (!faul_reset_is_done) {
 			ucData = 128;//128: Fault reset
 			faul_reset_is_done = TRUE;
 
-			/* Set output data */
+			// Set output data
 			if (0 == ucData_OperationMode) {
 				ucData_OperationMode = 1;//Sets Operation Mode once and forever: Profile Position mode
 			}
 
-			/* Update output data in process image */
+			// Update output data in process image
 			if (pucDio_OperationMode != 0) {
 				*pucDio_OperationMode = ucData_OperationMode;//EF mod, this pointer must be 10 bytes offset to "pucDio" --> OK!
 			}
@@ -1065,22 +1074,20 @@ static int CycleHandler(ECM_HANDLE hndDevice, int error)
 		if (*pucDio_TargetPosition == 0) {
 			//*pucDio_TargetPosition++ = ucData_TargetPosition;
 			*pucDio_TargetPosition = 0xD0;//LSB
-			*(pucDio_TargetPosition + 1) = 0x07;//MSB
+			*(pucDio_TargetPosition + 1) = 0x17;//MSB
 		}
 	}
 	else {
 		ucData = 31;//ON! Motor should move now!
-		/*else {
-			ucData = 31;//ON! Motor should move now!
-		}*/
+
 	}
-	cycleCounter++;
+	cycleCounter++;*/
 	//----------------------------
 
     // Update CONTROL WORD data in process image */
-    if (pucDio != 0) {
+    /*if (pucDio != 0) {
         *pucDio = ucData;//Controlword!
-    }
+    }*/
 
     /* If we start transmitting the data they may not be available yet */
     if ((g_ulIoMode & ECM_TEST_IO_MODE_TX_BEFORE_RX) != 0) {
@@ -2658,6 +2665,8 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		}
 	}
 
+	pucDio_ControlWord = pucDio;
+
 	//Get Operation mode pointer
 	result = ecmLookupVariable(hndMaster, "Operation mode",
 		&VarDesc, ECM_FLAG_GET_FIRST);
@@ -3023,7 +3032,7 @@ CecmTest::~CecmTest() {
 
 }
 
-int CecmTest::Init(int argc, char *argv[])
+int CecmTest::Init(int argc, char *argv[], bool is_running)
 {
 	ECM_VERSION  ecmVersion;
 	ECM_LIB_INIT libInitData;
@@ -3589,7 +3598,8 @@ int CecmTest::Init(int argc, char *argv[])
 
 		PrintStatistic(hndDevice, hndMaster);
 
-	} while (--g_lLoops > 0);
+	//} while ( (--g_lLoops > 0) );
+	} while ( (--g_lLoops > 0) && (is_running == true) );
 
 	printf("Detaching master...\n");
 	result = ecmDetachMaster(hndMaster);
@@ -4340,7 +4350,7 @@ int CecmTest::main(int argc, char *argv[])
     return 0;
 }
 
-void CecmTest::writePDRampSend(float fLoopTargetPos) {
+void CecmTest::writePDRampSend(float fTargetPos) {
 
 	//A ramp motion requires up to 7 consecutive commands
 	//1. Operation mode = 1
@@ -4350,9 +4360,34 @@ void CecmTest::writePDRampSend(float fLoopTargetPos) {
 	//5. Position target = X (read on other function)
 	//6. Control word = 31 (motion starts!)
 	//7. Control word = 15 (still mode) -> better wait until 'position target' is achieved
+		//5. Position target = X (read on other function)
 }
 
-bool CecmTest::MotionFRampMode(float fLoopTargetPos) {
+void CecmTest::writePDRampSend(int iTargetPos) {
+
+	//A ramp motion requires up to 7 consecutive commands
+	//1. Operation mode = 1
+	//2. Control word = 6 : Shutdown (enable voltage)
+	//3. Control word = 7 : Switch on
+	//4. Control word = 15 : Enable operation
+	//5. Position target = X (read on other function)
+	//6. Control word = 31 (motion starts!)
+	//7. Control word = 15 (still mode) -> better wait until 'position target' is achieved
+		//5. Position target = X (read on other function)
+
+	//STATES:
+	//Shutdown (enable voltage)
+	//Switch on
+	//Enable operation (a new position can be set!)
+	//Motion
+	//Enable operation (a new position can be set!)
+	//Motion
+
+}
+
+
+//bool CecmTest::MotionFRampMode(float fLoopTargetPos) {
+bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 
 	static uint8_t	ucData;
 	static uint64_t ucData64;
@@ -4361,56 +4396,59 @@ bool CecmTest::MotionFRampMode(float fLoopTargetPos) {
 	static uint32_t cycleCounter;
 
 	static BOOLEAN faul_reset_is_done = FALSE;//EF mod: To send a "RESET FAULT" just once
+   
+	//Ramp mode control variables
+	static int			decimator = 0;
+	const int	numCommands = 8;
+	static int			iCommand = 0;
+	//address (PDO) | value
+	struct shexadecimal_matrix {
+		uint8_t *PDOpointer;
+		uint8_t value;
+	};
+	//Commands matrix
+	static shexadecimal_matrix hexadecimal_matrix[numCommands] = {
+		pucDio_ControlWord,		0x80,//FAULT RESET
+		pucDio_OperationMode,	0x01,
+		pucDio_ControlWord,		0x06,
+		pucDio_ControlWord,		0x07,
+		pucDio_ControlWord,		0x0F,
+		pucDio_TargetPosition,	0x00,//POSITION TARGET
+		pucDio_ControlWord,		0X1F,
+		pucDio_ControlWord,		0X0F,
+	};
+	//update Position target value if new
+	/*if (hexadecimal_matrix[5].value != iLoopTargetPos) {
+		hexadecimal_matrix[5].value == iLoopTargetPos;
+	}*/
+	uint8_t pos[4] = { 0,0,0,0 };
+	ecmCpuToLe(&pos[0], &iLoopTargetPos, (const uint8_t *)"\x04\x00");
+	uint8_t * ppos = &pos[0];
 
-	/*
-	//EF mod: Just another value in output data!
-	if (cycleCounter < 500) {
+	if (iCommand < (numCommands) ) {
 
-		if (!faul_reset_is_done) {
-			ucData = 128;//128: Fault reset
-			faul_reset_is_done = TRUE;
-
-			// Set output data
-			if (0 == ucData_OperationMode) {
-				ucData_OperationMode = 1;//Sets Operation Mode once and forever: Profile Position mode
+		if (decimator > 30) {
+			if (iCommand != 5) {
+				*hexadecimal_matrix[iCommand].PDOpointer = hexadecimal_matrix[iCommand].value;//write value to memory (PDO)
 			}
-
-			// Update output data in process image
-			if (pucDio_OperationMode != 0) {
-				*pucDio_OperationMode = ucData_OperationMode;//EF mod, this pointer must be 10 bytes offset to "pucDio" --> OK!
+			else {
+				*hexadecimal_matrix[iCommand].PDOpointer = pos[0];
+				*(hexadecimal_matrix[iCommand].PDOpointer + 1) = pos[1];
+				*(hexadecimal_matrix[iCommand].PDOpointer + 2) = pos[2];
+				*(hexadecimal_matrix[iCommand].PDOpointer + 3) = pos[3];
 			}
+			iCommand++;
+			decimator = 0;
 		}
-		else {
-			ucData = 0;//0: default
-		}
-	}
-	else if (cycleCounter < 600) {
-		ucData = 6; //6: Shutdown 
-	}
-
-	else if (cycleCounter < 700) {
-		ucData = 7; //7: Switch on
-	}
-	else if (cycleCounter < 720) {
-		ucData = 15;//15: Switch on
-		//ucData_TargetPosition = 200;
-		if (*pucDio_TargetPosition == 0) {
-			//*pucDio_TargetPosition++ = ucData_TargetPosition;
-			*pucDio_TargetPosition = 0xD0;//LSB
-			*(pucDio_TargetPosition + 1) = 0x07;//MSB
-		}
+		else
+			decimator++;
+		return false;
 	}
 	else {
-
-		if (ucData == 31) {
-			ucData = 16;
-			return true;
-		}
-		ucData = 31;//ON! Motor should move now!
+		iCommand = 4;//for next iteration
+		return true;//END
 	}
-	cycleCounter++;*/
 
-	return false;//Not finished yet!
 }
 
 /******************************************************************************/

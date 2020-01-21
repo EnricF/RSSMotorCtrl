@@ -31,17 +31,27 @@ class CecmTest {
 		CecmTest(void);
 		~CecmTest(void);
 
-		int Init(int argc, char *argv[]);
+		int Init(int argc, char *argv[], bool is_running);
+		//int Init(int argc, char *argv[]);
 		//int Init(void);
 
 		/*
 		* Creates the commands sequence for a ramp mode motion
 		*/
-		static void writePDRampSend(float fLoopTargetPos);
+		static void writePDRampSend(float fTargetPos);
+		/*
+		* Creates the commands sequence for a ramp mode motion
+		*/
+		static void writePDRampSend(int iTargetPos);
+
 		/*
 		* Executes a single ramp motion
 		*/
-		static bool MotionFRampMode(float fLoopTargetPos);
+		//static bool MotionFRampMode(float fTargetPos);
+		/*
+		* Executes a single ramp motion
+		*/
+		static bool MotionFRampMode(int iTargetPos);
 };
 
 #if defined(__cplusplus)

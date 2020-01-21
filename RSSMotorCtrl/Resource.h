@@ -21,7 +21,6 @@
 #define IDC_EDIT_RAMP_MAXVEL            1010
 #define IDC_EDIT_RAMP_MAXACC            1011
 #define IDC_STATIC_RAMP_DELAY           1012
-#define IDC_EDIT_RAMP_MAXACC2           1013
 #define IDC_EDIT_RAMP_DELAY             1013
 #define IDC_STATIC_RAMP_STATE           1014
 #define IDC_STATIC_RAMP_STATEVALUE      1015

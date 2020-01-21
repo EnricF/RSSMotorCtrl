@@ -204,4 +204,6 @@ class CRSSMotorCtrlDlg : public CDialogEx
 	public:
 		afx_msg void OnStnClickedStaticRampUpperpos();
 		afx_msg void OnBnClickedButtonRampSend();
+		afx_msg void OnBnClickedOk();
+		afx_msg void OnBnClickedButtonRampStartloop();
 };

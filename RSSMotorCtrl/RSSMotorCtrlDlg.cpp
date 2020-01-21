@@ -26,8 +26,6 @@
 #define CV_PI 3.14159265359
 #endif
 
-
-
 // CAboutDlg dialog used for App About
 
 class CAboutDlg : public CDialogEx
@@ -81,6 +79,8 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON_RAMP_SEND, &CRSSMotorCtrlDlg::OnBnClickedButtonRampSend)
+	ON_BN_CLICKED(IDOK, &CRSSMotorCtrlDlg::OnBnClickedOk)
+	ON_BN_CLICKED(IDC_BUTTON_RAMP_STARTLOOP, &CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop)
 END_MESSAGE_MAP()
 
 
@@ -138,11 +138,11 @@ UINT ThreadECMWorker(LPVOID pParam) {
 	pObject->bThreadECMWActive = true;
 
 	//Init ECM and loop until end
-	pObject->cecmTest.Init(__argc, __argv);
+	pObject->cecmTest.Init(__argc, __argv, &pObject->bThreadWActive);//Receives main WORKER thread status (active TRUE or FALSE)
 			
 	WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for EMC thread to finish
 
-	pObject->bThreadWActive = false;
+	pObject->bThreadECMWActive = false;
 	//Control bucle
 	while (pObject->bThreadWActive)
 	{
@@ -420,23 +420,25 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 	CString szText;
 
 	//Get target position, velocity and acceleration 
-	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	fLoopTargetPos	= (float)(atof(szText)*CV_PI / 180.f);
-	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);		fLoopMaxVel		= (float)(atof(szText)*CV_PI / 180.f);
-	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);		fLoopMaxAcc		= (float)(atof(szText)*CV_PI / 180.f);
-
-	if (fLoopTargetPos <= 1.0)
-		fLoopTargetPos = 100.0;//default initial position
-	if (fLoopMaxVel <= 0.1)
-		fLoopMaxVel = 1.0;//default max velocity 
-	if (fLoopMaxAcc <= 0.1)
-		fLoopMaxAcc = 1.0;//default acceleration value
+	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	
+	iLoopTargetPos = (int)(atoi(szText));//fLoopTargetPos	= (float)(atof(szText)*CV_PI / 180.f);//old example in [rad]
+	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
+	fLoopMaxVel = (float)(atof(szText));
+	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
+	fLoopMaxAcc = (float)(atof(szText));
+		
 	
-	bSendRamp	= true;
+	//Set Acyclic meesages: MaxVel and MaxAcc
+	
 
+	bSendRamp	= true;
+		
 	motionMode	= DEV_M_POS;
 
-	//cecmTest.writePDRampSend(fLoopTargetPos);//Writes selected values to execute a Ramp Motion
 
+
+	//cecmTest.writePDRampSend(fLoopTargetPos);//Writes selected values to execute a Ramp Motion
+	//cecmTest.writePDRampSend(iLoopTargetPos);//Writes selected values to execute a Ramp Motion
 }
 
 
@@ -482,8 +484,7 @@ void CRSSMotorCtrlDlg::ExecuteRampMotionControl()
 			/*cCanESD.SetTargetVel(iCanId, fLoopMaxVel);
 			cCanESD.SetTargetAcc(iCanId, fLoopMaxAcc);
 			cCanESD.MotionFRampMode(iCanId, fLoopTargetPos);*/
-		
-			isFinished = cecmTest.MotionFRampMode(fLoopTargetPos);//single drive condition
+			isFinished = cecmTest.MotionFRampMode(iLoopTargetPos);//single drive condition
 		}
 
 		if(isFinished == true)
@@ -645,13 +646,12 @@ void CRSSMotorCtrlDlg::ExecuteMotion()
 				ExecuteRampMotionControl();
 				break;
 			}
-
-		//Velocity Motion Command
-		/*case DEV_M_VEL:
-		{
-			ExecuteVelMotionControl();
-			break;
-		}*/
+			//Velocity Motion Command
+			case DEV_M_VEL:
+			{
+				//ExecuteVelMotionControl();
+				break;
+			}
 		}
 	}
 	else if (bHaltMotor)
@@ -740,4 +740,16 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 		cCanESD.GetMotorCurrent(iCanId, dCurrent[CURRENT_A], dCurrent[CURRENT_B], dCurrent[CURRENT_C]);
 		cCanESD.GetActRawCur(iCanId, dCurrent[CURRENT_M]);
 	}*/
+}
+
+void CRSSMotorCtrlDlg::OnBnClickedOk()
+{
+	// TODO: Add your control notification handler code here
+	CDialogEx::OnOK();
+}
+
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop()
+{
+	// TODO: Add your control notification handler code here
 }
