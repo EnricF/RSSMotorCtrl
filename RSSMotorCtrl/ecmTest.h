@@ -52,6 +52,11 @@ class CecmTest {
 		* Executes a single ramp motion
 		*/
 		static bool MotionFRampMode(int iTargetPos);
+
+		/*
+		* Sets Profiler MaxVel MaxAcc and MaxDec values
+		*/
+		static void setProfiler(float *fLoopMaxVel, float *fLoopMaxAcc);
 };
 
 #if defined(__cplusplus)

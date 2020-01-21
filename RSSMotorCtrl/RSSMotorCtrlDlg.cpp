@@ -424,17 +424,22 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 	iLoopTargetPos = (int)(atoi(szText));//fLoopTargetPos	= (float)(atof(szText)*CV_PI / 180.f);//old example in [rad]
 	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
 	fLoopMaxVel = (float)(atof(szText));
-	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
+	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);
 	fLoopMaxAcc = (float)(atof(szText));
-		
 	
-	//Set Acyclic meesages: MaxVel and MaxAcc
-	
+	//Protection guards - Max Vel
+	if (fLoopMaxVel < 5.0)			fLoopMaxVel = 5.0;
+	else if(fLoopMaxVel > 20.0)		fLoopMaxVel = 20.0;
+	//Protection guards - Max Acc
+	if (fLoopMaxAcc < 5.0)			fLoopMaxAcc = 5.0;
+	else if (fLoopMaxAcc > 20.0)	fLoopMaxAcc = 20.0;
 
-	bSendRamp	= true;
-		
+	//Always before MOTION starts!!
+	cecmTest.setProfiler(&fLoopMaxVel, &fLoopMaxAcc);//Writes selected values to execute a Ramp Motion
+
+	//MOTION is ready
+	bSendRamp	= true;		
 	motionMode	= DEV_M_POS;
-
 
 
 	//cecmTest.writePDRampSend(fLoopTargetPos);//Writes selected values to execute a Ramp Motion

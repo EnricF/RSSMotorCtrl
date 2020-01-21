@@ -501,6 +501,9 @@ static uint8_t *pucDio_OperationMode	= NULL;//"Operation mode" pointer
 static uint8_t *pucDio_ControlWord		= NULL;//"Control Word" pointer
 static uint8_t *pucDio_TargetPosition	= NULL;//"Target position" pointer
 static uint8_t *pucDio_TargetVelocity	= NULL;//"Target velocity" pointer
+static uint8_t *pucDio_ProfilerMaxVel	= NULL;//"Profiler max. velocity" pointer
+static uint8_t *pucDio_ProfilerMaxAcc	= NULL;//"Profiler max. acceleration" pointer
+static uint8_t *pucDio_ProfilerMaxDec	= NULL;//"Profiler max. deceleration" pointer
 //Readings from slave
 static uint8_t *pucDio_StatusWord		= NULL;//"Status mode" pointer
 static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer
@@ -516,7 +519,6 @@ static int ecmTestCleanup(void);
 
 
 //Temporally global, to be moved inside its class
-//FILE log
 FILE * ECMlogFile;
 const char * cECMlogFile = "logFile.txt";
 
@@ -2664,10 +2666,10 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			fprintf(ECMlogFile,"Failed to get reference to Controlword Output\n");
 		}
 	}
+	//Get Control Word pointer (done just before)
+	pucDio_ControlWord = pucDio;//See upper code
 
-	pucDio_ControlWord = pucDio;
-
-	//Get Operation mode pointer
+	//Get Operation Mode pointer
 	result = ecmLookupVariable(hndMaster, "Operation mode",
 		&VarDesc, ECM_FLAG_GET_FIRST);
 	if (ECM_SUCCESS == result) {
@@ -2678,7 +2680,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		}
 	}
 
-	//Get Target position pointer
+	//Get Target Position pointer
 	result = ecmLookupVariable(hndMaster, "Target position",
 		&VarDesc, ECM_FLAG_GET_FIRST);
 	if (ECM_SUCCESS == result) {
@@ -2690,7 +2692,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		}
 	}
 
-	//Get Target velocity pointer
+	//Get Target Velocity pointer
 	result = ecmLookupVariable(hndMaster, "Target velocity",
 		&VarDesc, ECM_FLAG_GET_FIRST);
 	if (ECM_SUCCESS == result) {
@@ -2702,6 +2704,41 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		}
 	}
 
+	//Get Profiler Max Velocity pointer
+	result = ecmLookupVariable(hndMaster, "Profiler max. velocity",
+		&VarDesc, ECM_FLAG_GET_FIRST);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_OUTPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&	pucDio_ProfilerMaxVel
+		);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to Controlword Output\n");
+		}
+	}
+
+	//Get Profiler Max Acceleration pointer
+	result = ecmLookupVariable(hndMaster, "Profiler max. acceleration",
+		&VarDesc, ECM_FLAG_GET_FIRST);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_OUTPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&	pucDio_ProfilerMaxAcc
+		);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to Controlword Output\n");
+		}
+	}
+
+	//Get Profiler Max Deceleration pointer
+	result = ecmLookupVariable(hndMaster, "Profiler max. deceleration",
+		&VarDesc, ECM_FLAG_GET_FIRST);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_OUTPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&	pucDio_ProfilerMaxDec
+		);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to Controlword Output\n");
+		}
+	}
 	//Pointer to the memory location the reference pointer is stored
 	//(void **)&pucDio;
 	//----------------------------------------------
@@ -4385,6 +4422,23 @@ void CecmTest::writePDRampSend(int iTargetPos) {
 
 }
 
+//Sets Profiler
+void CecmTest::setProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
+	static float maxVel = 0, maxAcc = 0;//old values
+
+	if (maxVel != *fLoopMaxVel) {//New value
+		ecmCpuToLe(pucDio_ProfilerMaxVel, fLoopMaxVel, (const uint8_t *)"\x04\x00");
+		maxVel = *fLoopMaxVel;
+	}
+	
+	if (maxAcc != *fLoopMaxAcc) {//New value
+		ecmCpuToLe(pucDio_ProfilerMaxAcc, fLoopMaxAcc, (const uint8_t *)"\x04\x00");
+		ecmCpuToLe(pucDio_ProfilerMaxDec, fLoopMaxAcc, (const uint8_t *)"\x04\x00");//Re-uses "MaxAcc"
+		maxAcc = *fLoopMaxAcc;
+	}
+}
+//Writes selected values to execute a Ramp Motion
+
 
 //bool CecmTest::MotionFRampMode(float fLoopTargetPos) {
 bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
@@ -4398,9 +4452,11 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 	static BOOLEAN faul_reset_is_done = FALSE;//EF mod: To send a "RESET FAULT" just once
    
 	//Ramp mode control variables
-	static int			decimator = 0;
+	static int	decimator = 0;
 	const int	numCommands = 8;
-	static int			iCommand = 0;
+	static int	iCommand = 0;
+	//Little-Endian buffer
+	uint8_t LEbuffer[4] = { 0,0,0,0 };
 	//address (PDO) | value
 	struct shexadecimal_matrix {
 		uint8_t *PDOpointer;
@@ -4417,25 +4473,34 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 		pucDio_ControlWord,		0X1F,
 		pucDio_ControlWord,		0X0F,
 	};
-	//update Position target value if new
-	/*if (hexadecimal_matrix[5].value != iLoopTargetPos) {
-		hexadecimal_matrix[5].value == iLoopTargetPos;
-	}*/
-	uint8_t pos[4] = { 0,0,0,0 };
-	ecmCpuToLe(&pos[0], &iLoopTargetPos, (const uint8_t *)"\x04\x00");
-	uint8_t * ppos = &pos[0];
+	
+	ecmCpuToLe(&LEbuffer[0], &iLoopTargetPos, (const uint8_t *)"\x04\x00");
+	uint8_t * ppos = &LEbuffer[0];
 
-	if (iCommand < (numCommands) ) {
+	if (iCommand < (numCommands-1) ) {
 
-		if (decimator > 30) {
+		if (decimator > 50) {
+
+
 			if (iCommand != 5) {
 				*hexadecimal_matrix[iCommand].PDOpointer = hexadecimal_matrix[iCommand].value;//write value to memory (PDO)
+
+				//
+				/*if (iCommand == 1) {//At same time than Operation Mode
+
+					float fLoopMaxVel = 20.0;
+					ecmCpuToLe(pucDio_ProfilerMaxVel, &fLoopMaxVel, (const uint8_t *)"\x04\x00");
+					//maxVel = *fLoopMaxVel;
+				}*/
+
 			}
 			else {
-				*hexadecimal_matrix[iCommand].PDOpointer = pos[0];
-				*(hexadecimal_matrix[iCommand].PDOpointer + 1) = pos[1];
-				*(hexadecimal_matrix[iCommand].PDOpointer + 2) = pos[2];
-				*(hexadecimal_matrix[iCommand].PDOpointer + 3) = pos[3];
+				//ecmCpuToLe(hexadecimal_matrix[iCommand].PDOpointer, &iLoopTargetPos, (const uint8_t *)"\x04\x00");
+				
+				*hexadecimal_matrix[iCommand].PDOpointer		= LEbuffer[0];
+				*(hexadecimal_matrix[iCommand].PDOpointer + 1)	= LEbuffer[1];
+				*(hexadecimal_matrix[iCommand].PDOpointer + 2)	= LEbuffer[2];
+				*(hexadecimal_matrix[iCommand].PDOpointer + 3)	= LEbuffer[3];
 			}
 			iCommand++;
 			decimator = 0;
