@@ -27,6 +27,21 @@
 #define IDC_STATIC_RAMP_INFO            1016
 #define IDC_BUTTON_RAMP_SEND            1017
 #define IDC_BUTTON_RAMP_STARTLOOP       1018
+#define IDC_STATIC_VEL_VEL              1019
+#define IDC_STATIC_VEL_ACC              1020
+#define IDC_STATIC_VEL_VEL_DEG_S        1021
+#define IDC_STATIC_VEL_VEL_RPM          1022
+#define IDC_SLIDER_VEL_VEL              1023
+#define IDC_STATIC_VEL_ACC_DEG_S2       1024
+#define IDC_SLIDER_VEL_ACC              1025
+#define IDC_EDIT_VEL_VEL_DEG_S          1026
+#define IDC_EDIT_VEL_VEL_RPM            1027
+#define IDC_EDIT_VEL_ACC_DEG_S2         1028
+#define IDC_BUTTON_VEL_SET_VEL          1029
+#define IDC_BUTTON_VEL_SET_VEL_RPM      1030
+#define IDC_BUTTON_VEL_SET_VEL_ACC      1031
+#define IDC_CHECK_VEL_ALL               1032
+#define IDC_BUTTON_VEL_START            1033
 
 // Next default values for new objects
 // 
@@ -34,7 +49,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        130
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1018
+#define _APS_NEXT_CONTROL_VALUE         1033
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

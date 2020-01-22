@@ -9,9 +9,29 @@
 #ifndef ECMTEST_H
 #define ECMTEST_H
 
+//OPERATION MODE REGISTER
+#define POS_M			0x01//To write on Operation mode CiA register
+#define VEL_M			0x03//To write on Operation mode CiA register
+#define PROFILE_VEL_M	0x13//To write on Axis1 Operation mode register (with profiler!)
+
+//CONTROL WORD REGISTER
+#define	CTRLW_SHUTDOWN	0x06
+#define	CTRLW_SWITCHON	0x07
+#define	CTRLW_OPERATION	0x0F
+#define	CTRLW_POSMOTION	0x1F
+#define	CTRLW_VELMOTION 0x08//MSByte. It's LSByte is 0x0F (CTRLW_XXXXXX). TWO BYTES in total!
+#define	CTRLW_FAULT_RST	0x80
+
 #if defined(__cplusplus)
 extern "C" {//"C" mode
 #endif
+
+enum driveSTATE {
+	SHUTDOWN = 0,	//POWER ON and POWER OFF states (standby)
+	SWITCHON,		//second state after POWER ON (standby)
+	OPERATION,		//Motor has power, ready to receive MOTION parameters
+	MOTION			//MOTOR is in MOTION
+};
 
 class CecmTest {
 		//Solved from link: https://stackoverflow.com/questions/30581837/linker-error-when-calling-a-c-function-from-c-code-in-different-vs2010-project
@@ -19,6 +39,10 @@ class CecmTest {
 	
 	public:
 		FILE * ECMlogFile;
+
+
+
+		int driveState; //To known about which state are the drive&motor pack
 
 	public:
 		//Base version using Windows GUI
@@ -31,32 +55,54 @@ class CecmTest {
 		CecmTest(void);
 		~CecmTest(void);
 
-		int Init(int argc, char *argv[], bool is_running);
+		int Init(int argc, char *argv[], bool *is_running);
 		//int Init(int argc, char *argv[]);
 		//int Init(void);
 
 		/*
 		* Creates the commands sequence for a ramp mode motion
 		*/
-		static void writePDRampSend(float fTargetPos);
+		//static void writePDRampSend(float fTargetPos);
 		/*
 		* Creates the commands sequence for a ramp mode motion
 		*/
-		static void writePDRampSend(int iTargetPos);
+		//static void writePDRampSend(int iTargetPos);
 
 		/*
-		* Executes a single ramp motion
-		*/
-		//static bool MotionFRampMode(float fTargetPos);
-		/*
-		* Executes a single ramp motion
-		*/
-		static bool MotionFRampMode(int iTargetPos);
-
-		/*
-		* Sets Profiler MaxVel MaxAcc and MaxDec values
+		* Sets Profiler limits: MaxVel MaxAcc and MaxDec
 		*/
 		static void setProfiler(float *fLoopMaxVel, float *fLoopMaxAcc);
+
+		/*
+		* Executes a single ramp motion
+		* Ends with driver at MOTION state (Control Word = 31)
+		* Sets next iteration start from OPERATION state
+		* @param iTargetPos		Target Position in absolute [counts]
+		* @return				TRUE when MOTION command is written to "Control Word" register, otherwise is FALSE (so it will still being called until it ends)
+		*/
+		static bool MotionFRampMode(int iTargetPos);
+		/*
+		* Executes a single velocity motion. Not seful for dynamic velocity control!
+		* Ends with driver at MOTION state (Control Word = 2063)
+		* Sets next iteration start from OPERATION state
+		* @param iTargetVel		Target Velocity in [inc/s]
+		* @return				TRUE when MOTION command is written to "Control Word" register, otherwise is FALSE (so it will still being called until it ends)
+		*/
+		static bool MotionFVelMode(int iTargetVel);
+
+		/*
+		* Executes a single velocity motion. Useful for dynamic velocity control!
+		* Ends with driver at MOTION state (Control Word = 2063)
+		* Sets next iteration start from OPERATION state
+		* @param fProfileVel	Target Velocity in [mrev/s]
+		* @return				TRUE when MOTION command is written to "Control Word" register, otherwise is FALSE (so it will still being called until it ends)
+		*/
+		static bool MotionFProfileVelMode(float fProfileVel);
+
+		/*
+		* Stops motor motion, this means writing a 15(decimal) value in "Control Word" register
+		*/
+		void CecmTest::MotionStop(void);
 };
 
 #if defined(__cplusplus)

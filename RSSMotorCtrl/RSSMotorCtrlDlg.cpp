@@ -81,6 +81,8 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_RAMP_SEND, &CRSSMotorCtrlDlg::OnBnClickedButtonRampSend)
 	ON_BN_CLICKED(IDOK, &CRSSMotorCtrlDlg::OnBnClickedOk)
 	ON_BN_CLICKED(IDC_BUTTON_RAMP_STARTLOOP, &CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop)
+	ON_BN_CLICKED(IDC_BUTTON_VEL_SET_VEL_RPM, &CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm)
+	ON_BN_CLICKED(IDC_BUTTON_VEL_START, &CRSSMotorCtrlDlg::OnBnClickedButtonVelStart)
 END_MESSAGE_MAP()
 
 
@@ -140,17 +142,19 @@ UINT ThreadECMWorker(LPVOID pParam) {
 	//Init ECM and loop until end
 	pObject->cecmTest.Init(__argc, __argv, &pObject->bThreadWActive);//Receives main WORKER thread status (active TRUE or FALSE)
 			
-	WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for EMC thread to finish
+	//WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for EMC thread to finish
 
-	pObject->bThreadECMWActive = false;
+
 	//Control bucle
 	while (pObject->bThreadWActive)
 	{
 		//TODO
 
 	}
+
+	pObject->bThreadECMWActive = false;
 	//Finish Thread
-	pObject->bThreadWFinished = true;
+	pObject->bThreadECMWFinished = true;
 
 	return 0;//OK
 }
@@ -323,8 +327,9 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 	//Zeros Calibration
 	//InitZerosCalibration();
 	
-	//Create an ECM thread? Not decided yet, but valid for testing purposes.
-	   
+	//Wait for another thread? unknown yet
+	//WaitForSingleObject(ThreadWorker, INFINITE);
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -392,13 +397,15 @@ void CRSSMotorCtrlDlg::InitControlThreads()
 	bThreadECMWFinished = false;
 	bThreadRIFinished	= false;
 	dWorkerTPC			= THREAD_TPC;
+	dECMWorkerTPC		= THREAD_TPC;
 	dSecWorkerTPC		= THREAD_TPC;
 
 
 	//Create and run ECM thread
-	tECMWorker = AfxBeginThread(ThreadECMWorker, this, THREAD_PRIORITY_TIME_CRITICAL+1);
+	tECMWorker	= AfxBeginThread(ThreadECMWorker, this, THREAD_PRIORITY_TIME_CRITICAL+1);
+	
 	//Create and run control thread
-	tWorker = AfxBeginThread(ThreadWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
+	tWorker		= AfxBeginThread(ThreadWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
 
 	//Create and run interface thread
 	tRefreshInterface = AfxBeginThread(ThreadInterface, this, THREAD_PRIORITY_NORMAL);
@@ -440,10 +447,6 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 	//MOTION is ready
 	bSendRamp	= true;		
 	motionMode	= DEV_M_POS;
-
-
-	//cecmTest.writePDRampSend(fLoopTargetPos);//Writes selected values to execute a Ramp Motion
-	//cecmTest.writePDRampSend(iLoopTargetPos);//Writes selected values to execute a Ramp Motion
 }
 
 
@@ -494,6 +497,45 @@ void CRSSMotorCtrlDlg::ExecuteRampMotionControl()
 
 		if(isFinished == true)
 			bSendRamp = false;
+	}
+}
+
+
+void CRSSMotorCtrlDlg::ExecuteVelMotionControl()
+{
+	bool isFinished = false;
+
+	if (velRunning)
+	{
+		if (bMoveAllMotors)
+		{
+			/*cCanESD.SetTargetAcc(10, (float)velTargetAcc);
+			cCanESD.MotionFVelMode(10, (float)velTargetVel, 100);
+
+			cCanESD.SetTargetAcc(11, (float)velTargetAcc);
+			cCanESD.MotionFVelMode(11, (float)velTargetVel, 100);
+
+			cCanESD.SetTargetAcc(12, (float)velTargetAcc);
+			cCanESD.MotionFVelMode(12, (float)velTargetVel, 100);
+
+			cCanESD.SetTargetAcc(13, (float)velTargetAcc);
+			cCanESD.MotionFVelMode(13, (float)velTargetVel, 100);*/
+		}
+		else
+		{
+			//Start Profile Velocity mode!
+			velRunning = !cecmTest.MotionFProfileVelMode((float)velTargetVel/.06);//single drive condition
+			
+			//Basic version Velocity mode, old. Useful to set a single velocity, not re-usable
+			//velRunning = !cecmTest.MotionFVelMode(velTargetVelValue);//single drive condition
+		}
+
+	}
+	else//STOP!
+	{
+		//cecmTest.MotionStop();
+
+		motionMode = DEV_M_STOP;
 	}
 }
 
@@ -654,14 +696,13 @@ void CRSSMotorCtrlDlg::ExecuteMotion()
 			//Velocity Motion Command
 			case DEV_M_VEL:
 			{
-				//ExecuteVelMotionControl();
+				ExecuteVelMotionControl();
 				break;
 			}
 		}
 	}
 	else if (bHaltMotor)
 	{
-		//cCanESD.Halt(iCanId);
 		bMotorHalted = true;
 		bHaltMotor = false;
 	}
@@ -749,12 +790,79 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 
 void CRSSMotorCtrlDlg::OnBnClickedOk()
 {
-	// TODO: Add your control notification handler code here
+	cecmTest.MotionStop();
+	Sleep(1000);
+
 	CDialogEx::OnOK();
 }
 
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop()
 {
-	// TODO: Add your control notification handler code here
+	//CString szText;
+
+	SetDlgItemText(IDC_BUTTON_RAMP_STARTLOOP, "Not implemented yet!");
+
 }
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm()
+{
+	CString szText;
+	
+	GetDlgItemText(IDC_EDIT_VEL_VEL_RPM, szText);
+	velTargetVel = (double)(atof(szText));
+
+	setVelTargetVelValue((float)velTargetVel, IDC_EDIT_VEL_VEL_RPM);
+}
+
+// ------------------------------ ENCODER DETAILS ---------------------------
+// RM08 super small non - contact rotary encoder
+// Up to 4096 counts per revolution
+// Specifications: D:\Dropbox\1.1 EQUIP\4. COMPRES\Especificacions compra x prov\RLS_Renishaw\RM08SD0012B02L2G00
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
+{
+	CString szText;
+
+	if (velRunning)
+	{
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
+		cecmTest.MotionStop();
+	}
+	else//Velocity mode starts
+	{
+		//Get Velocity in RPM
+		GetDlgItemText(IDC_EDIT_VEL_VEL_RPM, szText);
+		velTargetVel = atof(szText);
+
+		setVelTargetVelValue((float)velTargetVel, IDC_EDIT_VEL_VEL_RPM);
+		
+		//Set Profiler limits
+		float fLoopMaxVel = 20.0;
+		float fLoopMaxAcc = 20.0;
+
+		cecmTest.setProfiler(&fLoopMaxVel, &fLoopMaxAcc);
+
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
+		motionMode = DEV_M_VEL;
+	}
+
+	velRunning = !velRunning;
+
+}
+
+void CRSSMotorCtrlDlg::setVelTargetVelValue(float vel, int mode) {
+
+	int incrementsPerLoop = 4096; //increments(counts) per loop
+	
+	switch (mode) {
+		case IDC_EDIT_VEL_VEL_RPM:
+			velTargetVelValue = (int)vel * incrementsPerLoop / 60;// inc/s
+			if (velTargetVelValue < 100)
+				velTargetVelValue = 100;// 100 inc/second is the minimum velocity by default
+			break;
+		default:
+			break;
+	}
+}
+

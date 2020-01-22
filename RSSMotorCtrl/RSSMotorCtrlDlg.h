@@ -21,7 +21,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						THREAD_TPC 5
 		#define						TIMER_EXIT 0
 
-					//Variables
+		//Variables
 		__int64						iFrequency;
 		int							iMTPC;
 
@@ -124,6 +124,27 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		int							motionMode;
 
+
+		//////////////////////////////////////////////////////////////////////////////////
+		//									STEP CONTROL								//
+		//////////////////////////////////////////////////////////////////////////////////
+
+		int							nStepFreq;
+		int							nStepTestPosition;
+		float						fStepTarget;
+		bool						bMoveAllMotors;
+
+		void						InitStepMotion();
+
+		//Cursor Control
+		POINT						stepCursorPos;
+		POINT						stepCursorLastPos;
+		double						stepCursorInc;
+		bool						stepCursorActive;
+
+		void						UpdateCursorPosition();
+
+
 		//////////////////////////////////////////////////////////////////////////////////
 		//									LOOP CONTROL								//
 		//////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +164,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int							iLoopDelay;
 		int							iLoopState;
 		
-		int							iLoopTargetPos;
+		int						iLoopTargetPos;
 		
 		#define						LOOP_MIN_ERROR				0.0017
 
@@ -163,8 +184,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		bool						LoopSM(double modulePos);
 		void						UpdateLoopValues();
 
-		void						ExecuteRampMotionControl();
-		
+		void						ExecuteRampMotionControl();//RAMP mode
 
 		void						GetDevices();
 		void						GetDefaultDeviceParameters();
@@ -176,6 +196,30 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						RecordDeviceData();
 		void						InitRecordDeviceData();
 
+
+		//////////////////////////////////////////////////////////////////////////////////
+		//							     VELOCITY CONTROL								//
+		//////////////////////////////////////////////////////////////////////////////////
+
+		bool						velRunning;
+		int							velTargetRPM;
+		double						velTargetVel;
+		double						velTargetAcc;
+
+		int							velTargetVelValue;
+		int							velTargetAccValue;
+
+		void						InitVelMotion();
+		void						UpdateVelMotionValues();
+		void						ExecuteVelMotionControl();//VEL mode
+		void						UpdateVelMotionInterface();
+
+		/*
+		* Calculates an [inc/s] velocity from RPM
+		* @param	vel		The velocity in RPM
+		* @param	mode	Conversion type (by now only from RPM, but to be upgraded soon)
+		*/
+		void						setVelTargetVelValue(float vel, int mode);
 
 
 	// Construction
@@ -202,8 +246,10 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg HCURSOR OnQueryDragIcon();
 		DECLARE_MESSAGE_MAP()
 	public:
-		afx_msg void OnStnClickedStaticRampUpperpos();
 		afx_msg void OnBnClickedButtonRampSend();
 		afx_msg void OnBnClickedOk();
 		afx_msg void OnBnClickedButtonRampStartloop();
+		afx_msg void OnBnClickedButtonVelSetVelRpm();
+		afx_msg void OnBnClickedButtonVelSetVelAcc2();
+		afx_msg void OnBnClickedButtonVelStart();
 };
