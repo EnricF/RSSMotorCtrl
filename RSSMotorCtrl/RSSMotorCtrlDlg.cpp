@@ -104,26 +104,6 @@ UINT ThreadInterface(LPVOID pParam)
 
 		//Initialize time counters
 		QueryPerformanceCounter((LARGE_INTEGER*)&initial);
-
-		//Show Timings to interface
-		/*pObject->ShowTiming();
-
-		//Update Interface Control values
-		pObject->ShowParameter(DEV_POS);
-		pObject->ShowParameter(DEV_VEL);
-		pObject->ShowParameter(DEV_ACC);
-		pObject->ShowParameter(DEV_MPOS);
-		pObject->ShowParameter(DEV_MVEL);
-		pObject->ShowParameter(DEV_MACC);
-		pObject->ShowParameter(DEV_TEMP);
-		pObject->ShowParameter(DEV_CUR);
-		pObject->ShowParameter(DEV_TPC);
-		pObject->ShowParameter(DEV_AMP);
-		pObject->ShowParameter(DEV_CTRL);
-		pObject->ShowParameter(DEV_CAN);
-		pObject->ShowParameter(DEV_PARAM1);
-		pObject->ShowParameter(DEV_PARAM2);
-		pObject->ShowParameter(DEV_PARAM3);*/
 	}
 
 	//Finish Thread
@@ -142,25 +122,20 @@ UINT ThreadECMWorker(LPVOID pParam) {
 	//Init ECM and loop until end
 	pObject->cecmTest.Init(__argc, __argv, &pObject->bThreadWActive);//Receives main WORKER thread status (active TRUE or FALSE)
 			
-	//WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for EMC thread to finish
-
+	//WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for Worker thread to finish	
 
 	//Control bucle
-	while (pObject->bThreadWActive)
+	while (pObject->bThreadECMWActive)
 	{
 		//TODO
-
+		//Sleep(1);
 	}
 
-	pObject->bThreadECMWActive = false;
 	//Finish Thread
 	pObject->bThreadECMWFinished = true;
 
 	return 0;//OK
 }
-
-
-
 
 //Control thread
 UINT ThreadWorker(LPVOID pParam)
@@ -170,25 +145,7 @@ UINT ThreadWorker(LPVOID pParam)
 	CRSSMotorCtrlDlg* pObject = (CRSSMotorCtrlDlg*)pParam;
 
 	pObject->bThreadWActive = true;
-	//pObject->record = false;
 
-
-	//Get Bus devices
-	/*pObject->GetDevices();
-
-	//Get and load default device parameters
-	pObject->GetDefaultDeviceParameters();
-
-	//Init current variables
-	pObject->currentA[0] = 0;
-	pObject->currentA[1] = 0;
-	pObject->currentA[2] = 0;
-
-	//Default values
-	pObject->currentData[0] = 0.0;
-	pObject->currentData[1] = 0.0;
-	pObject->currentData[2] = 0.0;
-	*/
 	//Control bucle
 	while (pObject->bThreadWActive)
 	{
@@ -209,18 +166,18 @@ UINT ThreadWorker(LPVOID pParam)
 		////////////////////////////////////////
 		// PARAMETERS
 
-		//pObject->GetDeviceParameters();
+		pObject->GetDeviceParameters();
 
 		////////////////////////////////////////
 		// UPDATE INTERFACE VALUES
 
-		/*pObject->UpdateInterfaceParameters();
+		//pObject->UpdateInterfaceParameters();
 
 
 		////////////////////////////////////////
 		// RECORD DEVICE DATA
 
-		pObject->RecordDeviceData();
+		/*pObject->RecordDeviceData();
 		pObject->RecordTemp();
 
 
@@ -267,8 +224,12 @@ UINT ThreadWorker(LPVOID pParam)
 		while ((final - initial)*1000.0 / pObject->iFrequency < 10) QueryPerformanceCounter((LARGE_INTEGER*)&final);
 	}
 
+//	DWORD ret = WaitForSingleObject(pObject->tECMWorker, INFINITE);//Waits for Worker thread to finish	
+
 	//Finish Thread
 	pObject->bThreadWFinished = true;
+	   
+	Sleep(1000);
 
 	return 0;
 }
@@ -305,15 +266,8 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-
-	//Init EtherCAT communication
-	//cecmslave.Init();
-	//cecmslave.Init(__argc, __argv);
-	//cCan2ESD.Init(0, 0);
-
-
 	//Init Device Data
-	//InitDevData();
+	InitDevData();
 
 	//Init Threads
 	InitControlThreads();//EF mod : new thread to Init() EtherCAT communication
@@ -402,7 +356,7 @@ void CRSSMotorCtrlDlg::InitControlThreads()
 
 
 	//Create and run ECM thread
-	tECMWorker	= AfxBeginThread(ThreadECMWorker, this, THREAD_PRIORITY_TIME_CRITICAL+1);
+	tECMWorker	= AfxBeginThread(ThreadECMWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
 	
 	//Create and run control thread
 	tWorker		= AfxBeginThread(ThreadWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
@@ -413,13 +367,131 @@ void CRSSMotorCtrlDlg::InitControlThreads()
 
 void CRSSMotorCtrlDlg::FinalizeControlThreads()
 {
-	bThreadWActive = false;
-	bThreadRIActive = false;
-	bThreadWSActive = false;
+
+	bThreadWActive		= false;
+	bThreadRIActive		= false;
+	bThreadECMWActive	= false;
+	bThreadWSActive		= false;
 
 	SetTimer(TIMER_EXIT, 500, 0);
 }
 
+
+//////////////////////////////////////////////////////////////////////////////////////
+//									DEVICE DATA										//
+//////////////////////////////////////////////////////////////////////////////////////
+
+void CRSSMotorCtrlDlg::InitDevData()
+{
+	for (int p = 0; p < DEV_PARAMS; p++)
+	{
+		for (int f = 0; f < DEV_FIELDS; f++)
+		{
+			dDevData[p][f] = 0;
+		}
+	}
+
+	//Position Initialization
+	dDevData[DEV_POS][DEV_ACT] = 0;		dDevData[DEV_POS][DEV_TARGET] = 0;		dDevData[DEV_POS][DEV_MIN] = -1;	dDevData[DEV_POS][DEV_MAX] = -1;	dDevData[DEV_POS][DEV_RANGE] = 360.f;
+
+	//Velocity Initialization
+	dDevData[DEV_VEL][DEV_ACT] = 0;		dDevData[DEV_VEL][DEV_TARGET] = 0;		dDevData[DEV_VEL][DEV_MIN] = -1;	dDevData[DEV_VEL][DEV_MAX] = -1;	dDevData[DEV_VEL][DEV_RANGE] = 360.f;
+
+	//Acceleration Initialization
+	dDevData[DEV_ACC][DEV_ACT] = 0;		dDevData[DEV_ACC][DEV_TARGET] = 0;		dDevData[DEV_ACC][DEV_MIN] = -1;	dDevData[DEV_ACC][DEV_MAX] = -1;	dDevData[DEV_ACC][DEV_RANGE] = 32768.f;
+
+	//Motor Position Initialization
+	dDevData[DEV_MPOS][DEV_ACT] = 0;	dDevData[DEV_MPOS][DEV_TARGET] = 0;		dDevData[DEV_MPOS][DEV_MIN] = -1;	dDevData[DEV_MPOS][DEV_MAX] = -1;	dDevData[DEV_MPOS][DEV_RANGE] = 2048;
+
+	//Motor Velocity Initialization
+	dDevData[DEV_MVEL][DEV_ACT] = 0;	dDevData[DEV_MVEL][DEV_TARGET] = 0;		dDevData[DEV_MVEL][DEV_MIN] = -1;	dDevData[DEV_MVEL][DEV_MAX] = -1;	dDevData[DEV_MVEL][DEV_RANGE] = 10000;
+
+	//Motor Acceleration Initialization
+	dDevData[DEV_MACC][DEV_ACT] = 0;	dDevData[DEV_MACC][DEV_TARGET] = 0;		dDevData[DEV_MACC][DEV_MIN] = -1;	dDevData[DEV_MACC][DEV_MAX] = -1;	dDevData[DEV_MACC][DEV_RANGE] = 20000;
+
+	//Motor Temperature Initialization
+	dDevData[DEV_TEMP][DEV_ACT] = 0;	dDevData[DEV_TEMP][DEV_TARGET] = 0;		dDevData[DEV_TEMP][DEV_MIN] = -1;	dDevData[DEV_TEMP][DEV_MAX] = -1;	dDevData[DEV_TEMP][DEV_RANGE] = 256;
+
+	//Motor Current Initialization
+	dDevData[DEV_CUR][DEV_ACT] = 0;		dDevData[DEV_CUR][DEV_TARGET] = 0;		dDevData[DEV_CUR][DEV_MIN] = -1;	dDevData[DEV_CUR][DEV_MAX] = -1;	dDevData[DEV_CUR][DEV_RANGE] = 2400;
+
+	//TPC Initialization
+	dDevData[DEV_TPC][DEV_ACT] = 0;		dDevData[DEV_TPC][DEV_TARGET] = 0;		dDevData[DEV_TPC][DEV_MIN] = -1;	dDevData[DEV_TPC][DEV_MAX] = -1;	dDevData[DEV_TPC][DEV_RANGE] = 256.f;//6000;
+
+	//Amplitude Initialization
+	dDevData[DEV_AMP][DEV_ACT] = 0;		dDevData[DEV_AMP][DEV_TARGET] = 0;		dDevData[DEV_AMP][DEV_MIN] = -1;	dDevData[DEV_AMP][DEV_MAX] = -1;	dDevData[DEV_AMP][DEV_RANGE] = 240.f;
+
+	//Control Initialization
+	dDevData[DEV_CTRL][DEV_ACT] = 0;	dDevData[DEV_CTRL][DEV_TARGET] = 0;		dDevData[DEV_CTRL][DEV_MIN] = -1;	dDevData[DEV_CTRL][DEV_MAX] = -1;	dDevData[DEV_CTRL][DEV_RANGE] = 256.f;
+
+	//CAN Initialization // Voltage
+	dDevData[DEV_CAN][DEV_ACT] = 0;		dDevData[DEV_CAN][DEV_TARGET] = 0;		dDevData[DEV_CAN][DEV_MIN] = -1;	dDevData[DEV_CAN][DEV_MAX] = -1;	dDevData[DEV_CAN][DEV_RANGE] = 256.f;
+
+	//Param1
+	dDevData[DEV_PARAM1][DEV_ACT] = 0;	dDevData[DEV_PARAM1][DEV_TARGET] = 0;	dDevData[DEV_PARAM1][DEV_MIN] = -1;	dDevData[DEV_PARAM1][DEV_MAX] = -1;	dDevData[DEV_PARAM1][DEV_RANGE] = 4096.f;
+
+	//Param2
+	dDevData[DEV_PARAM2][DEV_ACT] = 0;	dDevData[DEV_PARAM2][DEV_TARGET] = 0;	dDevData[DEV_PARAM2][DEV_MIN] = -1;	dDevData[DEV_PARAM2][DEV_MAX] = -1;	dDevData[DEV_PARAM2][DEV_RANGE] = 4096.f;
+
+	//Param3
+	dDevData[DEV_PARAM3][DEV_ACT] = 0;	dDevData[DEV_PARAM3][DEV_TARGET] = 0;	dDevData[DEV_PARAM3][DEV_MIN] = -1;	dDevData[DEV_PARAM3][DEV_MAX] = -1;	dDevData[DEV_PARAM3][DEV_RANGE] = 4096.f;
+
+	//Current A
+	dDevData[DEV_CURA][DEV_ACT] = 0;	dDevData[DEV_CURA][DEV_TARGET] = 0;		dDevData[DEV_CURA][DEV_MIN] = -1;	dDevData[DEV_CURA][DEV_MAX] = -1;	dDevData[DEV_CURA][DEV_RANGE] = 1024.f;
+
+	//Current B
+	dDevData[DEV_CURB][DEV_ACT] = 0;	dDevData[DEV_CURB][DEV_TARGET] = 0;		dDevData[DEV_CURB][DEV_MIN] = -1;	dDevData[DEV_CURB][DEV_MAX] = -1;	dDevData[DEV_CURB][DEV_RANGE] = 1024.f;
+
+	//Current C
+	dDevData[DEV_CURC][DEV_ACT] = 0;	dDevData[DEV_CURC][DEV_TARGET] = 0;		dDevData[DEV_CURC][DEV_MIN] = -1;	dDevData[DEV_CURC][DEV_MAX] = -1;	dDevData[DEV_CURC][DEV_RANGE] = 1024.f;
+
+	//Current Error
+	dDevData[DEV_CURERR][DEV_ACT] = 0;	dDevData[DEV_CURERR][DEV_TARGET] = 0;	dDevData[DEV_CURERR][DEV_MIN] = -1;	dDevData[DEV_CURERR][DEV_MAX] = -1;	dDevData[DEV_CURERR][DEV_RANGE] = 50.f;
+
+	//Init control variables
+	bSetModuleZero	= false;
+	bSetMotorZero	= false;
+	bSetGearRatio	= false;
+	bSetSerial		= false;
+	bSetCAN1Id		= false;
+	bSetCAN2Id		= false;
+	bStopMotor		= false;
+	bMoveMotorVel	= false;
+	bHaltMotor		= false;
+	bResetMotor		= false;
+	bBrakeMotor		= false;
+	bBrakeState		= false;
+	bWriteEEPROM	= false;
+
+	bMotorAddTemps = false;
+	//bCalibPosition = false;
+
+	InitLoopSM();
+
+	//Status Variables
+	bMotorHalted = false;
+	
+	//Init temperatures stabilization data
+	for (int i = 0; i < STABLE_TEMPS; i++)
+	{
+		for (int j = 0; j < STABLE_TIME; j++)
+			dTBuffer[i][j] = 0.0;
+
+		dTInc[i] = 0.0;
+	}
+
+	iTIdx = 0;
+	dMaxIncTemp = 0;
+	dAmbIncTemp = 0;
+
+	motorAddTemps[0] = 0.0;
+	motorAddTemps[1] = 0.0;
+	motorAddTemps[2] = 0.0;
+	motorAddTemps[3] = 0.0;
+	motorAddTemps[4] = 0.0;
+	motorAddTemps[5] = 0.0;
+	motorAddTemps[6] = 0.0;
+}
 
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
@@ -428,21 +500,23 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 
 	//Get target position, velocity and acceleration 
 	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	
-	iLoopTargetPos = (int)(atoi(szText));//fLoopTargetPos	= (float)(atof(szText)*CV_PI / 180.f);//old example in [rad]
+	iLoopTargetPos	= (int)(atoi(szText));			//[encoder absolute position]
+	//fLoopTargetPos	= (float)(atof(szText)*CV_PI / 180.f);	//old example in [rad]
+
 	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
 	fLoopMaxVel = (float)(atof(szText));
 	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);
 	fLoopMaxAcc = (float)(atof(szText));
 	
 	//Protection guards - Max Vel
-	if (fLoopMaxVel < 5.0)			fLoopMaxVel = 5.0;
+	/*if (fLoopMaxVel < 5.0)			fLoopMaxVel = 5.0;
 	else if(fLoopMaxVel > 20.0)		fLoopMaxVel = 20.0;
 	//Protection guards - Max Acc
 	if (fLoopMaxAcc < 5.0)			fLoopMaxAcc = 5.0;
-	else if (fLoopMaxAcc > 20.0)	fLoopMaxAcc = 20.0;
+	else if (fLoopMaxAcc > 20.0)	fLoopMaxAcc = 20.0;*/
 
 	//Always before MOTION starts!!
-	cecmTest.setProfiler(&fLoopMaxVel, &fLoopMaxAcc);//Writes selected values to execute a Ramp Motion
+	cecmTest.SetProfiler(&fLoopMaxVel, &fLoopMaxAcc);//Writes selected values to execute a Ramp Motion
 
 	//MOTION is ready
 	bSendRamp	= true;		
@@ -495,8 +569,10 @@ void CRSSMotorCtrlDlg::ExecuteRampMotionControl()
 			isFinished = cecmTest.MotionFRampMode(iLoopTargetPos);//single drive condition
 		}
 
-		if(isFinished == true)
+		if (isFinished == true) {
 			bSendRamp = false;
+		}
+			
 	}
 }
 
@@ -505,36 +581,15 @@ void CRSSMotorCtrlDlg::ExecuteVelMotionControl()
 {
 	bool isFinished = false;
 
-	if (velRunning)
-	{
-		if (bMoveAllMotors)
-		{
-			/*cCanESD.SetTargetAcc(10, (float)velTargetAcc);
-			cCanESD.MotionFVelMode(10, (float)velTargetVel, 100);
-
-			cCanESD.SetTargetAcc(11, (float)velTargetAcc);
-			cCanESD.MotionFVelMode(11, (float)velTargetVel, 100);
-
-			cCanESD.SetTargetAcc(12, (float)velTargetAcc);
-			cCanESD.MotionFVelMode(12, (float)velTargetVel, 100);
-
-			cCanESD.SetTargetAcc(13, (float)velTargetAcc);
-			cCanESD.MotionFVelMode(13, (float)velTargetVel, 100);*/
-		}
-		else
-		{
-			//Start Profile Velocity mode!
-			velRunning = !cecmTest.MotionFProfileVelMode((float)velTargetVel/.06);//single drive condition
+	if (velRunning){
+		//Start Profile Velocity mode!
+		velRunning = !cecmTest.MotionFProfileVelMode(velTargetVel/60.);//single drive condition
 			
-			//Basic version Velocity mode, old. Useful to set a single velocity, not re-usable
-			//velRunning = !cecmTest.MotionFVelMode(velTargetVelValue);//single drive condition
-		}
-
+		//Basic version Velocity mode, old. Useful to set a single velocity, not re-usable
+		//velRunning = !cecmTest.MotionFVelMode(velTargetVelValue);//single drive condition
 	}
-	else//STOP!
-	{
+	else{//STOP!
 		//cecmTest.MotionStop();
-
 		motionMode = DEV_M_STOP;
 	}
 }
@@ -574,65 +629,10 @@ void CRSSMotorCtrlDlg::GetDevices()
 }
 
 void CRSSMotorCtrlDlg::GetDefaultDeviceParameters()
-{/*
+{
 	for (int i = 0; i < 256; i++) motorParameters[i] = 0;
-
-	//Load default Parameters
-	cCanESD.GetDefHomeOffset(iCanId, motorParameters[BCAN_PARAM_DR_HOMEOFFSET]);
-	cCanESD.GetDefGearRatio(iCanId, motorParameters[BCAN_PARAM_DR_GEARRATIO]);
-	cCanESD.GetDefMinPos(iCanId, motorParameters[BCAN_PARAM_DR_MINPOS]);
-	cCanESD.GetDefMaxPos(iCanId, motorParameters[BCAN_PARAM_DR_MAXPOS]);
-	cCanESD.GetDefMaxDeltaPos(iCanId, motorParameters[BCAN_PARAM_DR_MAXDELTAPOS]);
-	cCanESD.GetDefMaxDeltaVel(iCanId, motorParameters[BCAN_PARAM_DR_MAXDELTAVEL]);
-	cCanESD.GetDefTorqueRatio(iCanId, motorParameters[BCAN_PARAM_DR_TORQUERATIO]);
-	cCanESD.GetDefMinVel(iCanId, motorParameters[BCAN_PARAM_DR_MINVEL]);
-	cCanESD.GetDefMaxVel(iCanId, motorParameters[BCAN_PARAM_DR_MAXVEL]);
-	cCanESD.GetDefMinAcc(iCanId, motorParameters[BCAN_PARAM_DR_MINACC]);
-	cCanESD.GetDefMaxAcc(iCanId, motorParameters[BCAN_PARAM_DR_MAXACC]);
-	cCanESD.GetDefMinCur(iCanId, motorParameters[BCAN_PARAM_DR_MINCUR]);
-	cCanESD.GetDefMaxCur(iCanId, motorParameters[BCAN_PARAM_DR_MAXCUR]);
-	cCanESD.GetDefHomeVel(iCanId, motorParameters[BCAN_PARAM_DR_HOMEVEL]);
-	cCanESD.GetDefHomeAcc(iCanId, motorParameters[BCAN_PARAM_DR_HOMEACC]);
-	cCanESD.GetDefRSSSerial(iCanId, motorParameters[BCAN_PARAM_DR_RSSSERIAL]);
-	cCanESD.GetDefConfig(iCanId, motorParameters[BCAN_PARAM_DR_CONFIG]);
-	cCanESD.GetDefPulsesPerTurn(iCanId, motorParameters[BCAN_PARAM_DR_PULSESPERTURN]);
-	cCanESD.GetDefRSSVersion(iCanId, motorParameters[BCAN_PARAM_DR_RSSVERSION]);
-	cCanESD.GetDefBrakeTimeOut(iCanId, motorParameters[BCAN_PARAM_DR_BRAKETIMEOUT]);
-	cCanESD.GetDefAddress(iCanId, motorParameters[BCAN_PARAM_DR_ADDRESS]);
-	cCanESD.GetDefPrimBaud(iCanId, motorParameters[BCAN_PARAM_DR_PRIMEBAUD]);
-	cCanESD.GetDefGearRatio(iCanId, gearFactor);
-	cCanESD.GetActConfig(iCanId, moduleConfig);
-	cCanESD.GetDefSecondaryAddress(iCanId, iCan2Id);
-
-	//Get Default Phase offsets
-	cCanESD.GetCurrentOffsets(iCanId, iPhaseOffsetX, iPhaseOffsetY, iPhaseOffsetZ);
-	cCanESD.GetCurrentZeros(iCanId, iPhaseZeroX, iPhaseZeroY, iPhaseZeroZ);
-
-	CString szGearRatio; szGearRatio.Format("%.2f", motorParameters[BCAN_PARAM_DR_GEARRATIO]);
-	SetDlgItemText(IDC_ACT_GEARRATIO, szGearRatio);
-
-	//Update Interface Values
-	SetDlgItemInt(IDC_PWM_SINA, iPhaseOffsetX);
-	SetDlgItemInt(IDC_PWM_SINB, iPhaseOffsetY);
-	SetDlgItemInt(IDC_PWM_SINC, iPhaseOffsetZ);
-	SetDlgItemInt(IDC_PWM_IA, iPhaseZeroX);
-	SetDlgItemInt(IDC_PWM_IB, iPhaseZeroY);
-	SetDlgItemInt(IDC_PWM_IC, iPhaseZeroZ);
-
-	//Module Configuration
-	if (moduleConfig & 0x00000001) bActiveBrake.SetCheck(true);
-	else bActiveBrake.SetCheck(false);
-
-	if (moduleConfig & 0x00000002) bActive24V1.SetCheck(true);
-	else bActive24V1.SetCheck(false);
-
-	if (moduleConfig & 0x00000004) bActive24V2.SetCheck(true);
-	else bActive24V2.SetCheck(false);
-
-	if (moduleConfig & 0x00000008) bActiveFANS.SetCheck(true);
-	else bActiveFANS.SetCheck(false);
-
-	lowPriorityParams = PRIORITY2;*/
+	
+	//TODO set default device parameters
 }
 
 void CRSSMotorCtrlDlg::ExecuteCommands()
@@ -718,106 +718,244 @@ void CRSSMotorCtrlDlg::ExecuteMotion()
 		//cCanESD.Brake(iCanId, bBrakeState);
 		bBrakeMotor = false;
 	}
+
+
+
+
+
 }
 
 void CRSSMotorCtrlDlg::GetDeviceParameters()
 {
-	///////////////////
-	//MOTOR	
-	/*
-	//Actual values
-	if (bPriSec[IFACE_PRI_SEC_MOTOR_POS]) cCanESD.GetActPos(iCanId, motorParameters[BCAN_PARAM_AR_ACTPOS]);
-	if (bPriSec[IFACE_PRI_SEC_MOTOR_VEL]) cCanESD.GetActVel(iCanId, motorParameters[BCAN_PARAM_AR_ACTVEL]);
-	if (bPriSec[IFACE_PRI_SEC_MOTOR_ACC]) cCanESD.GetActAcc(iCanId, motorParameters[BCAN_PARAM_AR_ACTACC]);
+	char pBuffer8[8];
+	char pBuffer16[16];
+	//double						dDevData[DEV_PARAMS][DEV_FIELDS];				//Device Data
 
-	//Target Values
-	if (bPriSec[IFACE_PRI_SEC_MOTOR_POS]) cCanESD.GetTargetPos(iCanId, motorParameters[BCAN_PARAM_AW_TARGET_POS]);
-	if (bPriSec[IFACE_PRI_SEC_MOTOR_VEL]) cCanESD.GetTargetVel(iCanId, motorParameters[BCAN_PARAM_AW_TARGET_VEL]);
-	if (bPriSec[IFACE_PRI_SEC_MOTOR_ACC]) cCanESD.GetTargetAcc(iCanId, motorParameters[BCAN_PARAM_AW_TARGET_ACC]);
+	dDevData[DEV_STATUS][DEV_ACT] = (float)cecmTest.GetStatus();//CiA register
+	
+	sprintf(&pBuffer8[0], "0x");
+	_itoa((int)dDevData[DEV_STATUS][DEV_ACT], &pBuffer8[2], 16);
+	SetDlgItemText(IDC_STATIC_RAMP_STATEVALUE, pBuffer8);
+	
+	
+	int actPos = cecmTest.GetActPos();//CiA register
+	char pBuffer2[16];
+	_itoa(actPos, pBuffer2, 10);
+	SetDlgItemText(IDC_EDIT_PARAM_POS_ACT, pBuffer2);
 
-	///////////////////
-	//ROTOR
 
-	//Actual values
-	if (bPriSec[IFACE_PRI_SEC_ROTOR_POS]) cCanESD.GetActRotorPos(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORPOS]);
-	if (bPriSec[IFACE_PRI_SEC_ROTOR_VEL]) cCanESD.GetActRotorVel(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORVEL]);
-	if (bPriSec[IFACE_PRI_SEC_ROTOR_ACC]) cCanESD.GetActRotorAcc(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORACC]);
+	int actVel = cecmTest.GetActVel();//CiA register
+	char pBuffer3[16];
+	_itoa(actVel, pBuffer3, 10);
+	SetDlgItemText(IDC_EDIT_PARAM_VEL_ACT, pBuffer3);
+	
 
-	//Target values	
-	if (bPriSec[IFACE_PRI_SEC_ROTOR_POS]) cCanESD.GetActRotorTargetPos(iCanId, motorParameters[BCAN_PARAM_AW_ACTROTORTARGETPOS]);
-	if (bPriSec[IFACE_PRI_SEC_ROTOR_VEL]) cCanESD.GetActRotorTargetVel(iCanId, motorParameters[BCAN_PARAM_AW_ACTROTORTARGETVEL]);
-	if (bPriSec[IFACE_PRI_SEC_ROTOR_ACC]) cCanESD.GetActRotorTargetAcc(iCanId, motorParameters[BCAN_PARAM_AW_ACTROTORTARGETACC]);
-
-	//Amplitude
-	if (bPriSec[IFACE_PRI_SEC_AMPLITUDE]) cCanESD.GetActRotorAmplitude(iCanId, motorParameters[BCAN_PARAM_AW_ACTROTORAMPLITUDE], motorParameters[BCAN_PARAM_AW_ACTROTORMAXAMPLITUDE]);
-
-	//Actual Position in encoder ticks
-	if (bPriSec[IFACE_PRI_SEC_TICKS]) cCanESD.GetActIPos(iCanId, motorParameters[BCAN_PARAM_AR_ACTIPOS]);
-
-	//Delta Pos i Delta Vel
-	if (bPriSec[IFACE_PRI_SEC_DELTAPOS]) cCanESD.GetActRotorDeltaPos(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORDELTAPOS]);
-	if (bPriSec[IFACE_PRI_SEC_DELTAVEL]) cCanESD.GetActRotorDeltaVel(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORDELTAVEL]);
-
-	//Params
-	if (bPriSec[IFACE_PRI_SEC_PARAM1]) cCanESD.GetActRotorParam1(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORPARAM1]);
-	if (bPriSec[IFACE_PRI_SEC_PARAM2]) cCanESD.GetActRotorParam2(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORPARAM2]);
-	if (bPriSec[IFACE_PRI_SEC_PARAM3]) cCanESD.GetActRotorParam3(iCanId, motorParameters[BCAN_PARAM_AR_ACTROTORPARAM3]);
-
-	//Get temperatures
-	if (bPriSec[IFACE_PRI_SEC_TEMP]) cCanESD.GetActFTemp(iCanId, dTemps[TEMP_T1], TEMP_T1);
-	if (bPriSec[IFACE_PRI_SEC_TEMP]) cCanESD.GetActFTemp(iCanId, dTemps[TEMP_T2], TEMP_T2);
-	if (bPriSec[IFACE_PRI_SEC_TEMP]) cCanESD.GetActFTemp(iCanId, dTemps[TEMP_T3], TEMP_T3);
-	if (bPriSec[IFACE_PRI_SEC_TEMP]) cCanESD.GetActFTemp(iCanId, dTemps[TEMP_M], TEMP_M);
-
-	//Power supply
-	if (bPriSec[IFACE_PRI_SEC_PWRSUPPLY])
-	{
-		cCanESD.GetActFMotorSupply(iCanId, motorParameters[BCAN_PARAM_AR_ACT_FMOTOR_SUPPLY]);
-		cCanESD.GetActFLogicSupply(iCanId, motorParameters[BCAN_PARAM_AR_ACT_FLOGIC_SUPPLY]);
-
-		//Update Voltages
-		dVoltages[VOLT_24] = motorParameters[BCAN_PARAM_AR_ACT_FMOTOR_SUPPLY];
-		dVoltages[VOLT_12] = motorParameters[BCAN_PARAM_AR_ACT_FLOGIC_SUPPLY];
-	}
-
-	//Get Currents
-	if (bPriSec[IFACE_PRI_SEC_CURRENTS])
-	{
-		cCanESD.GetMotorCurrent(iCanId, dCurrent[CURRENT_A], dCurrent[CURRENT_B], dCurrent[CURRENT_C]);
-		cCanESD.GetActRawCur(iCanId, dCurrent[CURRENT_M]);
-	}*/
+/*	cecmTest.GetActPos();
+	cecmTest.GetActVel();
+	cecmTest.GetMode();
+	cecmTest.GetPrimaryTemp();
+	cecmTest.GetLastError();
+	cecmTest.GetStatusAx1();//Axis1 register
+	*/
+	//old example (using a boleean array)
+	//if (bPriSec[IFACE_PRI_SEC_MOTOR_POS]) cCanESD.GetActPos(iCanId, motorParameters[BCAN_PARAM_AR_ACTPOS]);
 }
+
+
+void CRSSMotorCtrlDlg::UpdateInterfaceParameters()
+{
+	CString szState;
+
+	////////////////
+	// ROTOR
+
+	//Actual values
+	UpdateValue(DEV_MPOS, 2048);					//Range: 0..2048 (11 bits) ticks, up to 12 bits 
+	UpdateValue(DEV_MVEL, 20.0);					//Range: 0..20	[rev/s]
+	UpdateValue(DEV_MACC, 20.0);					//Range: 0..?	[rev/s^2]
+
+	//Target values
+	UpdateTargetValue(DEV_MPOS, (float)iLoopTargetPos);	//Rotor target position
+	UpdateTargetValue(DEV_MVEL, fLoopMaxVel);			//Rotor target Velocity
+	UpdateTargetValue(DEV_MACC, fLoopMaxAcc);			//Rotor target Acceleration
+
+	////////////////
+	// MOTOR (Who is rotor and who is motor?)
+
+	//Actual values
+	UpdateValue(DEV_POS, 2048);
+	UpdateValue(DEV_VEL, 20.0);
+	UpdateValue(DEV_ACC, 20.0);
+
+	//Target values
+	UpdateTargetValue(DEV_POS, (float)iLoopTargetPos);
+	UpdateTargetValue(DEV_VEL, fLoopMaxVel);
+	UpdateTargetValue(DEV_ACC, fLoopMaxAcc);
+}
+
+void CRSSMotorCtrlDlg::UpdateValue(int id, double value)
+{
+	dDevData[id][DEV_ACT] = value;
+
+	//Update Max-Min
+	if (dDevData[id][DEV_MIN] == -1 || dDevData[id][DEV_ACT] < dDevData[id][DEV_MIN]) dDevData[id][DEV_MIN] = dDevData[id][DEV_ACT];
+	if (dDevData[id][DEV_MAX] == -1 || dDevData[id][DEV_ACT] > dDevData[id][DEV_MAX]) dDevData[id][DEV_MAX] = dDevData[id][DEV_ACT];
+}
+
+void CRSSMotorCtrlDlg::UpdateTargetValue(int id, double value)
+{
+	dDevData[id][DEV_TARGET] = value;
+}
+
 
 void CRSSMotorCtrlDlg::OnBnClickedOk()
 {
-	cecmTest.MotionStop();
-	Sleep(1000);
-
+	FinalizeControlThreads();
+	
 	CDialogEx::OnOK();
 }
 
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop()
 {
-	//CString szText;
+	bLoopStart = !bLoopStart;
 
-	SetDlgItemText(IDC_BUTTON_RAMP_STARTLOOP, "Not implemented yet!");
+	//swap
+	if (bLoopStart) SetDlgItemText(IDC_BUTTON_RAMP_STARTLOOP, "Stop");
+	else			SetDlgItemText(IDC_BUTTON_RAMP_STARTLOOP, "Start");
 
+	//Get Loop Data
+	if (bLoopStart)
+	{
+		motionMode = DEV_M_POS;
+
+		iDelayCounter = 0;
+
+		UpdateLoopValues();
+
+		iLoopState = LOOP_STATE_INITIAL;
+
+		//Going to initial position
+		fLoopTargetPos = (float)(fLoopInitial*CV_PI / 180.f);
+
+		bSendLoopCommand = true;
+
+	}
+}
+
+
+void CRSSMotorCtrlDlg::InitLoopSM()
+{
+	CString szText;
+
+	bLoopStart		= false;
+	bSendRamp		= false;
+	bSendLoopCommand= false;
+
+	//Initial values
+	iLoopDelay		= 0;
+	fLoopUpper		= 1000.;
+	fLoopInitial	= 0.;
+	fLoopLower		= -1000.;
+	fLoopMaxVel		= 20.0;
+	fLoopMaxAcc		= 20.0;
+
+	//Initial State
+	iLoopState		= LOOP_STATE_INITIAL;
+
+	//Load Initial values
+	szText.Format("%.d",	iLoopDelay);	SetDlgItemText(IDC_EDIT_RAMP_DELAY, szText);
+	szText.Format("%.2f",	fLoopInitial);	SetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);
+	szText.Format("%.2f",	fLoopUpper);	SetDlgItemText(IDC_EDIT_RAMP_UPPERPOS, szText);
+	szText.Format("%.2f",	fLoopLower);	SetDlgItemText(IDC_EDIT_RAMP_LOWERPOS, szText);
+	szText.Format("%.2f",	fLoopMaxVel);	SetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
+	szText.Format("%.2f",	fLoopMaxAcc);	SetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);
+}
+
+void CRSSMotorCtrlDlg::UpdateLoopValues()
+{
+	CString szText;
+
+	float actLoopMaxVel;
+	float actLoopMaxAcc;
+
+	//Load Initial values
+	GetDlgItemText(IDC_EDIT_RAMP_DELAY, szText);		iLoopDelay		= atoi(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	fLoopInitial	= (float)atof(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_UPPERPOS, szText);		fLoopUpper		= (float)atof(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_LOWERPOS, szText);		fLoopLower		= (float)atof(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);		actLoopMaxVel	= (float)atof(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);		actLoopMaxAcc	= (float)atof(szText);
+
+	//Get Interface Target Values and parse to radians
+	float auxfLoopMaxVel = (float)(actLoopMaxVel*CV_PI / 180.f);
+	float auxfLoopMaxAcc = (float)(actLoopMaxAcc*CV_PI / 180.f);
+
+	if (fLoopMaxVel != auxfLoopMaxVel)
+	{
+		fLoopMaxVel = auxfLoopMaxVel;
+		cecmTest.SetProfilerMaxVel(fLoopMaxVel);
+	}
+
+	if (fLoopMaxAcc != auxfLoopMaxAcc)
+	{
+		fLoopMaxAcc = auxfLoopMaxAcc;
+		cecmTest.SetProfilerMaxAcc(fLoopMaxAcc);
+		cecmTest.SetProfilerMaxDec(fLoopMaxAcc);//re-use
+	}
+	//Always before MOTION starts!!
 }
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm()
 {
-	CString szText;
-	
-	GetDlgItemText(IDC_EDIT_VEL_VEL_RPM, szText);
-	velTargetVel = (double)(atof(szText));
+	if (velRunning){
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
 
-	setVelTargetVelValue((float)velTargetVel, IDC_EDIT_VEL_VEL_RPM);
+		//motionMode = DEV_M_STOP;
+	}
+	else{//Velocity mode starts
+
+		//Get control value	
+		velTargetRPM = GetDlgItemInt(IDC_EDIT_VEL_VEL_RPM);
+		//velTargetVel = velTargetRPM / 60.0;	//no gear, no [rad] units
+		velTargetVel = velTargetRPM;		//TODO : it has no sense, review variables naming and their use
+
+		setVelTargetVelValue((float)velTargetVel, IDC_EDIT_VEL_VEL_RPM);
+
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
+		motionMode = DEV_M_VEL;
+	}
+	velRunning = !velRunning;
+
+	//Update Slider control
+	/*scPosition.SetRange(0, 20);
+	scPosition.SetTic(2);
+	scPosition.SetTic(3);
+	scPosition.SetTic(6);
+	//scPosition.SetPos(2);
+	scPosition.SetPos(velTargetVel);*/
+
+	UpdateVelMotionInterface();
 }
+
+void CRSSMotorCtrlDlg::UpdateVelMotionInterface()
+{
+	CString szData;
+
+	SetDlgItemInt(IDC_EDIT_VEL_VEL_RPM, velTargetRPM);
+
+	szData.Format("%.3f", velTargetVel*360.);
+	SetDlgItemText(IDC_EDIT_VEL_VEL_DEG_S, szData);
+
+	szData.Format("%.3f", velTargetAcc*360.);
+	SetDlgItemText(IDC_EDIT_VEL_ACC_DEG_S2, szData);
+}
+
 
 // ------------------------------ ENCODER DETAILS ---------------------------
 // RM08 super small non - contact rotary encoder
 // Up to 4096 counts per revolution
+// Configured to 2048 counter per revolution
 // Specifications: D:\Dropbox\1.1 EQUIP\4. COMPRES\Especificacions compra x prov\RLS_Renishaw\RM08SD0012B02L2G00
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
@@ -827,7 +965,8 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
 	if (velRunning)
 	{
 		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
-		cecmTest.MotionStop();
+
+		//motionMode = DEV_M_STOP;
 	}
 	else//Velocity mode starts
 	{
@@ -841,28 +980,54 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
 		float fLoopMaxVel = 20.0;
 		float fLoopMaxAcc = 20.0;
 
-		cecmTest.setProfiler(&fLoopMaxVel, &fLoopMaxAcc);
+		cecmTest.SetProfiler(&fLoopMaxVel, &fLoopMaxAcc);
 
 		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
 		motionMode = DEV_M_VEL;
 	}
 
 	velRunning = !velRunning;
-
 }
 
 void CRSSMotorCtrlDlg::setVelTargetVelValue(float vel, int mode) {
 
-	int incrementsPerLoop = 4096; //increments(counts) per loop
+	int incrementsPerLoop = 2048; //increments(counts) per loop
 	
 	switch (mode) {
 		case IDC_EDIT_VEL_VEL_RPM:
-			velTargetVelValue = (int)vel * incrementsPerLoop / 60;// inc/s
-			if (velTargetVelValue < 100)
-				velTargetVelValue = 100;// 100 inc/second is the minimum velocity by default
+			velTargetVelValue = (int)vel / 60;// [rev/s]
+			if (velTargetVelValue > 1000)
+				velTargetVelValue = 1;// 100 inc/second is the minimum velocity by default
+			else if (velTargetVelValue < -1000)
+				velTargetVelValue = -1;// 100 inc/second is the minimum velocity by default
 			break;
 		default:
 			break;
 	}
 }
 
+void CRSSMotorCtrlDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	if (pScrollBar == (CScrollBar *)&scPosition)
+	{
+		velTargetVelValue = scPosition.GetPos();
+		UpdateVelMotionValues();
+	}
+	else if (pScrollBar == (CScrollBar *)&scAmplitude)
+	{
+		velTargetAccValue = scAmplitude.GetPos();
+		UpdateVelMotionValues();
+	}
+
+	CDialogEx::OnHScroll(nSBCode, nPos, pScrollBar);
+}
+
+void CRSSMotorCtrlDlg::UpdateVelMotionValues()
+{
+	velTargetRPM = velTargetVelValue - 7500;
+	velTargetVel = velTargetRPM * 2 * CV_PI / (gearFactor*60.0);
+	velTargetAcc = (velTargetAccValue - 2500)*CV_PI / 1800.0;
+
+
+	UpdateVelMotionInterface();
+}

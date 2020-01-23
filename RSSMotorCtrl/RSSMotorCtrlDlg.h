@@ -60,7 +60,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		CecmTest					cecmTest;//EtherCAT slave
 
 		//////////////////////////////////////////////////////////////////////////////////
-		//									DEVICE DATA									//
+		//						DEVICE DATA		(aka PARAMETERS)						//
 		//////////////////////////////////////////////////////////////////////////////////
 
 		//Definitions
@@ -72,7 +72,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_RANGE		4								//Max parameter range value
 
 		#define						DEV_PARAMS		20								//Device Parameters
-		#define						DEV_IND			8								//Device Individual Parameters
+		#define						DEV_IND			8								//Device Individual Parameters	- exclusive for each drive/motor
 		#define						DEV_NONE		0								//Device Module None			
 		#define						DEV_POS			1								//Device Module Position
 		#define						DEV_VEL			2								//Device Module Velocity
@@ -81,7 +81,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_MVEL		5								//Device Motor Velocity
 		#define						DEV_MACC		6								//Device Motor Acceleration
 		#define						DEV_AMP			7								//Device Module Temperature
-		#define						DEV_CUR			8								//Device Module Current
+		#define						DEV_CUR			8								//Device Module Current			- Common to all drives/motors
 		#define						DEV_TPC			9								//Device Module TPC cycle
 		#define						DEV_TPC_SEC		10								//Device Module TPC cycle secondary thread
 		#define						DEV_TEMP		10								//Device Module Amplitude
@@ -91,6 +91,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_PARAM1		13								//Device Module CAN errors
 		#define						DEV_PARAM2		14								//Device Module CAN errors
 		#define						DEV_PARAM3		15								//Device Module CAN errors
+		#define						DEV_STATUS		15								//Device Module Status word
 		#define						DEV_CURA		16								//Device Module CAN errors
 		#define						DEV_CURB		17								//Device Module CAN errors
 		#define						DEV_CURC		18								//Device Module CAN errors
@@ -104,7 +105,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_M_STEP		5
 
 		//Variables
-		double						dDevData[DEV_PARAMS][DEV_FIELDS];				//Device Data
+		double						dDevData[DEV_PARAMS][DEV_FIELDS];				//Device Data PARAMETERS
 		bool						bSetModuleZero;									//Control module zero set
 		bool						bSetMotorZero;									//Control motor zero set
 		bool						bSetGearRatio;									//Control motor gear ratio set
@@ -123,27 +124,67 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		bool						bContinuous;
 
 		int							motionMode;
+		
+		//Functions
+		void						InitDevData();									//Initialize device data structs
+		void						UpdateValue(int id, double v);					//Update Value
+		void						UpdateTargetValue(int id, double v);			//Update Target Value
 
+
+		double						gearFactor;
+		unsigned int				moduleConfig;
+
+		bool						bUpdateConfig;
 
 		//////////////////////////////////////////////////////////////////////////////////
-		//									STEP CONTROL								//
+		//							      GLOBAL FUNCTIONS								//
 		//////////////////////////////////////////////////////////////////////////////////
 
-		int							nStepFreq;
-		int							nStepTestPosition;
-		float						fStepTarget;
-		bool						bMoveAllMotors;
+		#define						PRIORITY1	0
+		#define						PRIORITY2	1
+		#define						PRIORITY3	2
+		#define						PRIORITY4	3
 
-		void						InitStepMotion();
+		#define						MAX_PARAMS	255
+		double						motorParameters[MAX_PARAMS];
+		int							lowPriorityParams;		//1: Set 1 | 2: Set2 
 
-		//Cursor Control
-		POINT						stepCursorPos;
-		POINT						stepCursorLastPos;
-		double						stepCursorInc;
-		bool						stepCursorActive;
+		//Auxiliar temperatures
+		#define MOTOR_AUX_TEMPS				7
+		#define MOTOR_AUX_TEMP_FRE			0
+		#define MOTOR_AUX_TEMP_MICRO_IN		1
+		#define MOTOR_AUX_TEMP_MICRO_CO		2
+		#define MOTOR_AUX_TEMP_DA			3
+		#define MOTOR_AUX_TEMP_INTERIOR		4
+		#define MOTOR_AUX_TEMP_TAPA			5
+		#define MOTOR_AUX_TEMP_IND			6
 
-		void						UpdateCursorPosition();
+		double						motorAddTemps[MOTOR_AUX_TEMPS];
+		bool						bMotorAddTemps;
 
+		//Estabilització de la temperatura: Temperatures en 1 hora (3600s)
+		#define						STABLE_TEMPS 11
+		#define						STABLE_TIME	360
+		double						dTBuffer[STABLE_TEMPS][STABLE_TIME];
+		double						dTInc[STABLE_TEMPS];
+		int							iTIdx;
+		double						dMaxIncTemp;
+		double						dAmbIncTemp;
+
+		void						GetDevices();
+		void						GetDefaultDeviceParameters();
+		void						ExecuteCommands();
+		void						ExecuteMotion();
+		void						GetDeviceParameters();
+		void						GetSecondaryDeviceParameters();
+		void						UpdateInterfaceParameters();
+		void						RecordDeviceData();
+		void						InitRecordDeviceData();
+
+		bool						recCurData;										//Indicates current data recording
+		long						recCurSample;
+		__int64						recCurITime;
+		CFile						curDataFile;
 
 		//////////////////////////////////////////////////////////////////////////////////
 		//									LOOP CONTROL								//
@@ -158,13 +199,14 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						LOOP_STATE_DELAY_FL			6
 
 		bool						bLoopStart;
+		//EDIT BOXES
 		float						fLoopInitial;
 		float						fLoopUpper;
 		float						fLoopLower;
 		int							iLoopDelay;
 		int							iLoopState;
 		
-		int						iLoopTargetPos;
+		int							iLoopTargetPos;				//[enconder absolute position]
 		
 		#define						LOOP_MIN_ERROR				0.0017
 
@@ -186,16 +228,6 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		void						ExecuteRampMotionControl();//RAMP mode
 
-		void						GetDevices();
-		void						GetDefaultDeviceParameters();
-		void						ExecuteCommands();
-		void						ExecuteMotion();
-		void						GetDeviceParameters();
-		void						GetSecondaryDeviceParameters();
-		void						UpdateInterfaceParameters();
-		void						RecordDeviceData();
-		void						InitRecordDeviceData();
-
 
 		//////////////////////////////////////////////////////////////////////////////////
 		//							     VELOCITY CONTROL								//
@@ -213,6 +245,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						UpdateVelMotionValues();
 		void						ExecuteVelMotionControl();//VEL mode
 		void						UpdateVelMotionInterface();
+		
 
 		/*
 		* Calculates an [inc/s] velocity from RPM
@@ -252,4 +285,11 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg void OnBnClickedButtonVelSetVelRpm();
 		afx_msg void OnBnClickedButtonVelSetVelAcc2();
 		afx_msg void OnBnClickedButtonVelStart();
+		afx_msg void OnBnClickedButton1();
+
+		//Sliders
+		CSliderCtrl scPosition;//modify name
+		CSliderCtrl scAmplitude;//modify name
+		afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+
 };

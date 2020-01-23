@@ -41,7 +41,28 @@
 #define IDC_BUTTON_VEL_SET_VEL_RPM      1030
 #define IDC_BUTTON_VEL_SET_VEL_ACC      1031
 #define IDC_CHECK_VEL_ALL               1032
+#define IDC_STATIC_PARAM                1032
 #define IDC_BUTTON_VEL_START            1033
+#define IDC_STATIC_PARAM_ACTUAL         1035
+#define IDC_STATIC_PARAM_TARGET         1036
+#define IDC_STATIC_PARAM_MAX            1037
+#define IDC_STATIC_PARAM_VEL            1038
+#define IDC_STATIC_PARAM_ACC            1039
+#define IDC_STATIC_PARAM_POS            1040
+#define IDC_STATIC_PARAM_T              1041
+#define IDC_EDIT_PARAM_POS_ACT          1042
+#define IDC_EDIT_PARAM_POS_TARGET       1043
+#define IDC_EDIT_PARAM_POS_MAX          1044
+#define IDC_EDIT_PARAM_VEL_ACT          1045
+#define IDC_EDIT_PARAM_VEL_TARGET       1046
+#define IDC_EDIT_PARAM_VEL_MAX          1047
+#define IDC_EDIT_PARAM_ACC_ACT          1048
+#define IDC_EDIT_PARAM_ACC_TARGET       1049
+#define IDC_EDIT_PARAM_ACC_MAX          1050
+#define IDC_EDIT_PARAM_T_ACT            1051
+#define IDC_EDIT_PARAM_T_TARGET         1052
+#define IDC_EDIT_PARAM_ACC_MAX2         1053
+#define IDC_EDIT_PARAM_T_MAX            1053
 
 // Next default values for new objects
 // 
@@ -49,7 +70,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        130
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1033
+#define _APS_NEXT_CONTROL_VALUE         1035
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

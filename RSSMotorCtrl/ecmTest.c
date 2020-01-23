@@ -511,24 +511,25 @@ static uint8_t *pucDio_PositionSetPoint		= NULL;//"Target position" pointer	0x20
 static uint8_t *pucDio_VelocitySetPoint		= NULL;//"Target velocity" pointer	0x2021 (Axis1)
 
 //Readings from slave
-static uint8_t *pucDio_StatusWord		= NULL;//"Status mode" pointer
-static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer
-static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer
-static uint8_t *pucDio_DisplayOperationMode = NULL;//"Operation mode display" pointer
-static uint8_t *pucDio_PrimareTemperature	= NULL;//"Primary temperature value" pointer
+static uint8_t *pucDio_StatusWord		= NULL;//"Status mode" pointer						(CiA)
+static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer					(CiA)
+static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer					(CiA)
+static uint8_t *pucDio_DisplayOperationMode = NULL;//"Operation mode display" pointer		(CiA)
+static uint8_t *pucDio_PrimaryTemperature	= NULL;//"Primary temperature value" pointer	(Axis1)
+static uint8_t *pucDio_StatusWord2			= NULL;//"Status mode" pointer					(Axis1)
 
 //----------------
 //MOTION variables
 //----------------
 int			decimator				= 0;//a decimator of GUI loops, so ProcessData (EtherCAT) is updated at lower rate than GUI
-//Ramp mode control variables
+//Profile Position (Ramp) mode control variables
 const int	numCommandsProfilePos	= 7;
 int			iCommandProfilePos		= 0;//iterator of actual command in Profile Position mode
 //Velocity mode control variables
-const int	numCommandsVel	= 7;
-int			iCommandVel		= 0;//iterator of actual command in Profile Velocity mode
+const int	numCommandsVel			= 7;
+int			iCommandVel				= 0;//iterator of actual command in Profile Velocity mode
 //Profile Velocity mode control variables
-const int	numCommandsProfileVel	= 10;
+const int	numCommandsProfileVel	= 7;
 int			iCommandProfileVel		= 0;//iterator of actual command in Profile Velocity mode
 
 //Little-Endian buffer
@@ -2616,6 +2617,61 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         }
     }
 
+	//Get Status Word (CiA)
+	result = ecmLookupVariable(hndMaster, "Statusword", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_StatusWord);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+		}
+	}	
+
+	//Get Position Actual (CiA)
+	result = ecmLookupVariable(hndMaster, "Position actual", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_PositionActual);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+		}
+	}
+
+	//Get Velocity Actual (CiA)
+	result = ecmLookupVariable(hndMaster, "Velocity actual", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_VelocityActual);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+		}
+	}
+
+	//Get Mode of operation (display) (CiA)
+	result = ecmLookupVariable(hndMaster, "Mode of operation display", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_OperationModeAxis1);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+		}
+	}
+
+	//Get Mode of operation (display) (CiA)
+	result = ecmLookupVariable(hndMaster, "Primary temperature value", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_PrimaryTemperature);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+		}
+	}
+
     /*
      * Get reference to process variables
      */
@@ -3507,10 +3563,10 @@ int CecmTest::Init(int argc, char *argv[], bool *is_running)
 	/* INIT -> OP loop */
 	do {
 		/* Wait some cycles */
-		ecmSleep(100);//EF mod, default value is 100 ms
+		ecmSleep(1);//EF mod, default value is 100 ms
 
 		/* Do some I/O using async services in INIT state */
-		PrintEscRegister(hndMaster);
+		//PrintEscRegister(hndMaster);
 
 		/*
 		* Change EtherCAT network state to into OPERATIONAL.
@@ -3590,7 +3646,7 @@ int CecmTest::Init(int argc, char *argv[], bool *is_running)
 			/* Check exit condition */
 			if ((g_lRuntime != 0) && i >= (int)g_lRuntime) {
 				break;
-			}
+			}	
 
 			/* Print device state (virtual variable) */
 			if (pDevState != NULL) {
@@ -3641,12 +3697,12 @@ int CecmTest::Init(int argc, char *argv[], bool *is_running)
 			* in between.
 			*/
 			if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER)) {
-				ecmSleep(100);//EF mod, default is 1000 ms
+				ecmSleep(1);//EF mod, default is 1000 ms
 			}
 			else {
 				for (j = 0; j < 100; j++) {
 					DoEcatIo(hndDevice);
-					ecmSleep(10);
+					ecmSleep(1);//EF mod, default is 10 ms
 				}
 			}
 
@@ -3667,10 +3723,10 @@ int CecmTest::Init(int argc, char *argv[], bool *is_running)
 			return(-1);
 		}
 
-		PrintStatistic(hndDevice, hndMaster);
+		//PrintStatistic(hndDevice, hndMaster);
 
-	//} while ( (--g_lLoops > 0) );
-	} while ( (--g_lLoops > 0) && (*is_running == true) );
+	} while ( (--g_lLoops > 0) );
+	//} while ( *is_running == true );
 
 	printf("Detaching master...\n");
 	result = ecmDetachMaster(hndMaster);
@@ -4422,23 +4478,6 @@ int CecmTest::main(int argc, char *argv[])
 }
 
 
-
-//Sets Profiler limits
-void CecmTest::setProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
-	static float maxVel = 0., maxAcc = 0.;//to keep already set (prev.) values
-
-	if (maxVel != *fLoopMaxVel) {//New value
-		ecmCpuToLe(pucDio_ProfilerMaxVel, fLoopMaxVel, (const uint8_t *)"\x04\x00");
-		maxVel = *fLoopMaxVel;
-	}
-	
-	if (maxAcc != *fLoopMaxAcc) {//New value
-		ecmCpuToLe(pucDio_ProfilerMaxAcc, fLoopMaxAcc, (const uint8_t *)"\x04\x00");
-		ecmCpuToLe(pucDio_ProfilerMaxDec, fLoopMaxAcc, (const uint8_t *)"\x04\x00");//Re-uses "MaxAcc"
-		maxAcc = *fLoopMaxAcc;
-	}
-}
-
 /*
 * MOTION CONTROL DETAILS (EXAMPLE FOR RAMP MODE)
 //A ramp motion requires up to 7 consecutive commands
@@ -4464,16 +4503,16 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 
 	//Commands matrix (STATIC!) --> VALIDATED
 	static commandsMatrix ProfilePosMatrix[numCommandsProfilePos] = {
-		pucDio_ControlWord,		CTRLW_FAULT_RST,//FAULT RESET
-		pucDio_OperationMode,	POS_M,
-		pucDio_ControlWord,		CTRLW_SHUTDOWN,
-		pucDio_ControlWord,		CTRLW_SWITCHON,
-		pucDio_ControlWord,		CTRLW_OPERATION,
-		pucDio_TargetPosition,	0x00,//POSITION TARGET
-		pucDio_ControlWord,		CTRLW_POSMOTION,
+		pucDio_OperationModeAxis1,	PROFILE_POS_M,
+		pucDio_ControlWordAxis1,	CTRLW_SHUTDOWN,
+		pucDio_ControlWordAxis1,	CTRLW_SWITCHON,
+		pucDio_ControlWordAxis1,	CTRLW_OPERATION,
+		pucDio_ControlWordAxis1+1,	0x00,//Clear new set-point bit
+		pucDio_PositionSetPoint,	0x00,//POSITION TARGET
+		pucDio_ControlWordAxis1+1,	0x02,//New set-point
 	};
-
-	/*static commandsMatrix ProfilePosMatrix[numCommandsProfilePos+1] = {//NOT WORKING (Summit PDF p.220)
+	//OLD: Pos mode matrix
+	/*static commandsMatrix PosMatrix[numCommandsProfilePos+1] = {//NOT WORKING (Summit PDF p.220)
 		pucDio_ControlWord,		0x80,//FAULT RESET
 		pucDio_OperationMode,	0x14,
 		pucDio_TargetPosition,	0x00,//POSITION TARGET
@@ -4508,7 +4547,7 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 		return false;
 	}
 	else {
-		iCommandProfilePos = 4;//for next iteration
+		iCommandProfilePos = 3;//for next iteration
 		return true;//END
 	}
 }
@@ -4517,14 +4556,11 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel) {
 	
 	//Commands matrix (STATIC!)
 	static commandsMatrix ProfileVelMatrix[numCommandsProfileVel] = {
-		pucDio_ProfilerMaxVel,		20,
-		pucDio_ProfilerMaxAcc,		20,
-		pucDio_ProfilerMaxDec,		20,
 		pucDio_OperationModeAxis1,	PROFILE_VEL_M,
 		pucDio_ControlWordAxis1,	CTRLW_SHUTDOWN,
 		pucDio_ControlWordAxis1,	CTRLW_SWITCHON,
 		pucDio_ControlWordAxis1,	CTRLW_OPERATION,
-		pucDio_ControlWordAxis1 + 1,0x00,//Two bytes PROFILE MOTION command: 2nd byte (new set-point bit reset!)
+		pucDio_ControlWordAxis1+1,	0x00,//Two bytes PROFILE MOTION command: 2nd byte (new set-point bit reset!)
 		pucDio_VelocitySetPoint,	0x00,//VELOCITY SET-POINT
 		pucDio_ControlWordAxis1+1,	0x02,//Two bytes PROFILE MOTION command: 2nd byte
 	};
@@ -4533,7 +4569,7 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel) {
 
 		if (decimator > 50) {
 
-			if (iCommandProfileVel != 8) {
+			if (iCommandProfileVel != 5) {
 				*ProfileVelMatrix[iCommandProfileVel].PDOpointer = ProfileVelMatrix[iCommandProfileVel].value;//write value to memory (PDO)
 			}
 			else {
@@ -4553,7 +4589,7 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel) {
 		return false;
 	}
 	else {
-		iCommandProfileVel = 6;//for next iteration
+		iCommandProfileVel = 3;//for next iteration
 		return true;//END
 	}
 
@@ -4605,19 +4641,84 @@ bool CecmTest::MotionFVelMode(int iTargetVel) {
 
 void CecmTest::MotionStop(void) {
 
-	static const int numCommandsStop = 6;
+	static const int numCommandsStop = 8;
 	static commandsMatrix StopMatrix[numCommandsStop] = {
 		pucDio_TargetVelocity,		0x00,
 		pucDio_TargetVelocity + 1,	0x00,
 		pucDio_TargetVelocity + 2,	0x00,
 		pucDio_TargetVelocity + 3,	0x00,
 		pucDio_ControlWord,			0x0F,
-		pucDio_ControlWord + 1,		0x00
+		pucDio_ControlWord+1,		0x00,
+		pucDio_ControlWordAxis1,	0x0F,
+		pucDio_ControlWordAxis1+1,	0x00,
 	};
 	//Motor should be on OPERATION mode, still at a fixed position
 	for (int i = 0; i < numCommandsStop; i++) {
 		*StopMatrix[i].PDOpointer = StopMatrix[i].value;//write value to memory (PDO)
 	}
+}
+
+//---------
+// GETTERS
+//---------
+short CecmTest::GetStatus(void) {
+
+	if (pucDio_StatusWord != NULL)
+		return *(short*)pucDio_StatusWord;	
+	else
+		return 0;
+}
+
+int CecmTest::GetActPos(void) {
+	static int actPos;
+
+	if (pucDio_PositionActual != NULL) {
+		ecmCpuToLe(&actPos, pucDio_PositionActual, (const uint8_t *)"\x04\x0");
+		return actPos;
+	}		
+	else
+		return 0;
+}
+
+int CecmTest::GetActVel(void) {
+	static int actVel;
+
+	if (pucDio_VelocityActual != NULL) {
+		ecmCpuToLe(&actVel, pucDio_VelocityActual, (const uint8_t *)"\x04\x0");
+		return ( (float)actVel/1000 );
+	}
+	else
+		return 0;
+}
+
+//---------
+// SETTERS
+//---------
+void CecmTest::SetProfilerMaxVel(float fVel) {
+	//static int setVel = (int)fVel;
+
+	if (pucDio_ProfilerMaxVel != NULL) 
+		ecmCpuToLe(pucDio_ProfilerMaxVel, &fVel, (const uint8_t *)"\x04\x0");
+}
+void CecmTest::SetProfilerMaxAcc(float fAcc) {
+	//static int setAcc = (int)fAcc;
+
+	if (pucDio_ProfilerMaxAcc != NULL) 
+		ecmCpuToLe(pucDio_ProfilerMaxAcc, &fAcc, (const uint8_t *)"\x04\x0");
+}
+
+void CecmTest::SetProfilerMaxDec(float fDec) {
+	//static int setDec = (int)fDec;
+
+	if (pucDio_ProfilerMaxDec != NULL) 
+		ecmCpuToLe(pucDio_ProfilerMaxDec, &fDec, (const uint8_t *)"\x04\x0");
+}
+
+//Sets Profiler limits
+void CecmTest::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
+	SetProfilerMaxVel(*fLoopMaxVel);
+	SetProfilerMaxAcc(*fLoopMaxAcc);
+	SetProfilerMaxDec(*fLoopMaxAcc);
 }
 
 /******************************************************************************/

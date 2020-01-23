@@ -19,6 +19,32 @@
 
 #define NUMCOMMANDS 2 //How many acyclic commands you want to send;
 
+//----------------------------
+//--------- PARAMETERS -------
+//----------------------------
+/*
+typedef struct sParameter {
+	float actual;
+	float target;
+	float max;
+	float min;
+	bool enabled;
+}sParameter;
+
+typedef struct sDeviceParameters {
+	sParameter pos;//Position
+	sParameter vel;//Velocity
+	sParameter acc;//Acceleration
+}sDeviceParameters;
+
+typedef struct sDeviceInfo {
+	short				status;
+	short				prev_status = 0;//Previous status
+	sDeviceParameters	params;
+}sDeviceInfo;*/
+//---------------------------
+
+
 //To pass command line execution arguments to a Windows Thread
 typedef struct MyData {
 	int argc;
