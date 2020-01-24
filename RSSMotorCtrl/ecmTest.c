@@ -4525,7 +4525,7 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 
 	if ( iCommandProfilePos < (numCommandsProfilePos) ) {
 
-		if ( decimator > 50 ) {
+		if ( decimator > 10 ) {
 
 			if ( iCommandProfilePos != 5 ) {
 				*ProfilePosMatrix[iCommandProfilePos].PDOpointer = ProfilePosMatrix[iCommandProfilePos].value;//write value to memory (PDO)

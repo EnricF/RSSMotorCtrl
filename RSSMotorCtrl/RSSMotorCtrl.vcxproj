@@ -197,6 +197,7 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="bethercat.h" />
     <ClInclude Include="ecmTest.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="globalVar.h" />

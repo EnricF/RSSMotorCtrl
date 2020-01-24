@@ -59,6 +59,16 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		CecmTest					cecmTest;//EtherCAT slave
 
+
+		//////////////////////////////////////////////////////////////////////////////////
+		//									2D Interface								//
+		//////////////////////////////////////////////////////////////////////////////////
+
+		void						UpdateTimings();
+		void						ShowTiming();
+		void						ClearTiming(int id);
+		void						ShowParameter(int id);
+
 		//////////////////////////////////////////////////////////////////////////////////
 		//						DEVICE DATA		(aka PARAMETERS)						//
 		//////////////////////////////////////////////////////////////////////////////////
@@ -175,8 +185,13 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						GetDefaultDeviceParameters();
 		void						ExecuteCommands();
 		void						ExecuteMotion();
+		/*
+		* Writes readings from PD to motorParameters[][] matrix
+		*/
 		void						GetDeviceParameters();
-		void						GetSecondaryDeviceParameters();
+		/*
+		* Writes readings from motorParameters[][] matrix to EDITBOXES in GUI
+		*/
 		void						UpdateInterfaceParameters();
 		void						RecordDeviceData();
 		void						InitRecordDeviceData();
@@ -200,18 +215,21 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		bool						bLoopStart;
 		//EDIT BOXES
-		float						fLoopInitial;
-		float						fLoopUpper;
-		float						fLoopLower;
+		float						fLoopInitial;	//[absolute radians]
+		float						fLoopUpper;		//[absolute radians]
+		float						fLoopLower;		//[absolute radians]
 		int							iLoopDelay;
 		int							iLoopState;
 		
-		int							iLoopTargetPos;				//[enconder absolute position]
-		
-		#define						LOOP_MIN_ERROR				0.0017
 
-		float						fLoopPos;
-		float						fLoopTargetPos;
+		
+		#define						LOOP_MIN_ERROR				0.0017 //[rad]
+		#define						LOOP_MIN_ERROR_ENC			1 //[encoder counts]
+
+		float						fLoopPos;		//[absolute radians]
+		int							iLoopPos;		//[enconder absolute position]
+		float						fLoopTargetPos;	//[absolute radians]
+		int							iLoopTargetPos;	//[enconder absolute position]
 		float						fLoopMaxVel;
 		float						fLoopMaxAcc;
 		
@@ -223,7 +241,16 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int							iDelayCounter;
 
 		void						InitLoopSM();
-		bool						LoopSM(double modulePos);
+		//bool						LoopSM(double modulePos);//old, its param was never used (why?)
+		/*
+		* A Finite state machine switch() function. It controls RAMP motion (initial, upper, lower, upper, lower, ...)
+		*/
+		bool						LoopSM();
+
+		/*
+		* 		To know if the user has changed GUI values on EditBoxes, work in progress.
+		*		It will send new PROFILER parameters if changed (it doesn't set new POSITIONS yet!)
+		*/
 		void						UpdateLoopValues();
 
 		void						ExecuteRampMotionControl();//RAMP mode
@@ -284,4 +311,5 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		CSliderCtrl scAcceleration;// Acceleration control slider in Velocity Motion group
 		afx_msg void OnBnClickedButtonVelSetVel();
 		afx_msg void OnBnClickedStaticRamp3();
+		afx_msg void OnBnClickedButtonRecData();
 };

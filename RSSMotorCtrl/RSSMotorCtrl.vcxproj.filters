@@ -39,6 +39,9 @@
     <ClInclude Include="globalVar.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="bethercat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RSSMotorCtrl.cpp">
