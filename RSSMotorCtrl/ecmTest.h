@@ -76,22 +76,22 @@ class CecmTest {
 		*/
 		static bool MotionFRampMode(int iTargetPos);
 		/*
-		* Executes a single velocity motion. Not seful for dynamic velocity control!
+		* Executes a single velocity motion. Not useful for dynamic/variable velocity control!
 		* Ends with driver at MOTION state (Control Word = 2063)
 		* Sets next iteration start from OPERATION state
-		* @param iTargetVel		Target Velocity in [inc/s]
+		* @param iTargetVel		Target Velocity in [inc/s]. Target velocity register (0x60FF)
 		* @return				TRUE when MOTION command is written to "Control Word" register, otherwise is FALSE (so it will still being called until it ends)
 		*/
-		static bool MotionFVelMode(int iTargetVel);
+		static bool MotionFVelMode(int iTargetVel_inc_s);
 
 		/*
-		* Executes a single velocity motion. Useful for dynamic velocity control!
+		* Executes a velocity motion. Useful for dynamic/variable velocity control!
 		* Ends with driver at MOTION state (Control Word = 2063)
-		* Sets next iteration start from OPERATION state
-		* @param fProfileVel	Target Velocity in [mrev/s]
-		* @return				TRUE when MOTION command is written to "Control Word" register, otherwise is FALSE (so it will still being called until it ends)
+		* Sets next iteration start from OPERATION state (so another velocity can be set after)
+		* @param fProfileVel_rev_s	Target Velocity in [rev/s], Velocity set-point register (0x021)
+		* @return					TRUE when MOTION command is written to "Control Word" register, otherwise is FALSE (so it will still being called until it ends)
 		*/
-		static bool MotionFProfileVelMode(float fProfileVel);
+		static bool MotionFProfileVelMode(float fProfileVel_rev_s);
 
 		/*
 		* Stops motor motion, this means writing a 15(decimal) value in "Control Word" register

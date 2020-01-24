@@ -234,26 +234,17 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//////////////////////////////////////////////////////////////////////////////////
 
 		bool						velRunning;
-		int							velTargetRPM;
-		double						velTargetVel;
+		int							velTargetRPM;// Velocity Target in [rpm]
+		double						velTargetVel;// Velocity Target in [rev/s]
 		double						velTargetAcc;
 
-		int							velTargetVelValue;
+		int							velTargetVelValue; // Velocity Target in [rpm] with and offset of 7500
 		int							velTargetAccValue;
 
 		void						InitVelMotion();
 		void						UpdateVelMotionValues();
 		void						ExecuteVelMotionControl();//VEL mode
 		void						UpdateVelMotionInterface();
-		
-
-		/*
-		* Calculates an [inc/s] velocity from RPM
-		* @param	vel		The velocity in RPM
-		* @param	mode	Conversion type (by now only from RPM, but to be upgraded soon)
-		*/
-		void						setVelTargetVelValue(float vel, int mode);
-
 
 	// Construction
 	public:
@@ -288,8 +279,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg void OnBnClickedButton1();
 
 		//Sliders
-		CSliderCtrl scPosition;//modify name
-		CSliderCtrl scAmplitude;//modify name
-		afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
-
+		afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);		
+		CSliderCtrl scVelocity;	// Velocity slider inside Velocity Motion group							
+		CSliderCtrl scAcceleration;// Acceleration control slider in Velocity Motion group
+		afx_msg void OnBnClickedButtonVelSetVel();
+		afx_msg void OnBnClickedStaticRamp3();
 };

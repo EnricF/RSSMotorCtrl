@@ -72,6 +72,8 @@ CRSSMotorCtrlDlg::CRSSMotorCtrlDlg(CWnd* pParent /*=nullptr*/)
 void CRSSMotorCtrlDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_SLIDER_VEL_VEL, scVelocity);
+	DDX_Control(pDX, IDC_SLIDER_VEL_ACC, scAcceleration);
 }
 
 BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
@@ -83,6 +85,8 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_RAMP_STARTLOOP, &CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop)
 	ON_BN_CLICKED(IDC_BUTTON_VEL_SET_VEL_RPM, &CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm)
 	ON_BN_CLICKED(IDC_BUTTON_VEL_START, &CRSSMotorCtrlDlg::OnBnClickedButtonVelStart)
+	ON_WM_HSCROLL()
+	ON_BN_CLICKED(IDC_BUTTON_VEL_SET_VEL, &CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVel)
 END_MESSAGE_MAP()
 
 
@@ -283,6 +287,13 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 	
 	//Wait for another thread? unknown yet
 	//WaitForSingleObject(ThreadWorker, INFINITE);
+
+	// TODO: Add extra initialization here
+	scVelocity.SetRange(-20, 20, TRUE);
+	scVelocity.SetPos(0);
+	scAcceleration.SetRange(-20, 20, TRUE);
+	scAcceleration.SetPos(0);
+
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -583,7 +594,7 @@ void CRSSMotorCtrlDlg::ExecuteVelMotionControl()
 
 	if (velRunning){
 		//Start Profile Velocity mode!
-		velRunning = !cecmTest.MotionFProfileVelMode(velTargetVel/60.);//single drive condition
+		velRunning = !cecmTest.MotionFProfileVelMode(velTargetVel);//single drive condition
 			
 		//Basic version Velocity mode, old. Useful to set a single velocity, not re-usable
 		//velRunning = !cecmTest.MotionFVelMode(velTargetVelValue);//single drive condition
@@ -717,12 +728,7 @@ void CRSSMotorCtrlDlg::ExecuteMotion()
 	{
 		//cCanESD.Brake(iCanId, bBrakeState);
 		bBrakeMotor = false;
-	}
-
-
-
-
-
+	}	   	  
 }
 
 void CRSSMotorCtrlDlg::GetDeviceParameters()
@@ -910,30 +916,50 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm()
 {
 	if (velRunning){
 		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
-
-		//motionMode = DEV_M_STOP;
 	}
 	else{//Velocity mode starts
 
 		//Get control value	
-		velTargetRPM = GetDlgItemInt(IDC_EDIT_VEL_VEL_RPM);
-		//velTargetVel = velTargetRPM / 60.0;	//no gear, no [rad] units
-		velTargetVel = velTargetRPM;		//TODO : it has no sense, review variables naming and their use
-
-		setVelTargetVelValue((float)velTargetVel, IDC_EDIT_VEL_VEL_RPM);
+		velTargetRPM		= GetDlgItemInt(IDC_EDIT_VEL_VEL_RPM);//[RPM]
+		velTargetVel		= (double)velTargetRPM / 60.;//no gear, no [rad] units --> in [rev/s] units
+		velTargetVelValue	= velTargetRPM + 7500;	//TODO : why?
 
 		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
 		motionMode = DEV_M_VEL;
 	}
 	velRunning = !velRunning;
 
-	//Update Slider control
-	/*scPosition.SetRange(0, 20);
-	scPosition.SetTic(2);
-	scPosition.SetTic(3);
-	scPosition.SetTic(6);
-	//scPosition.SetPos(2);
-	scPosition.SetPos(velTargetVel);*/
+	//scVelocity.SetPos(velTargetVelValue);//TODO : why?
+	scVelocity.SetPos((int)velTargetVel);//[rev/s]
+
+	UpdateVelMotionInterface();
+}
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVel()
+{
+	CString szText;
+
+	if (velRunning) {
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
+	}
+	else {//Velocity mode starts
+
+		//Get control value	
+		GetDlgItemText(IDC_EDIT_VEL_VEL_DEG_S, szText);
+		velTargetVel		= (float)(atof(szText));//[deg/s]
+		velTargetVel		= velTargetVel / 360.;//[rev/s]
+		velTargetRPM		= (int)velTargetVel * 60;//no gear, no [rad] units --> in [rpm] units
+		velTargetVelValue	= velTargetRPM + 7500;	//TODO : why?
+
+
+
+
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
+		motionMode = DEV_M_VEL;
+	}
+	velRunning = !velRunning;
+
+	scVelocity.SetPos((int)velTargetVel);//[rev/s]
 
 	UpdateVelMotionInterface();
 }
@@ -942,7 +968,7 @@ void CRSSMotorCtrlDlg::UpdateVelMotionInterface()
 {
 	CString szData;
 
-	SetDlgItemInt(IDC_EDIT_VEL_VEL_RPM, velTargetRPM);
+	SetDlgItemInt(IDC_EDIT_VEL_VEL_RPM, velTargetVel*60.);
 
 	szData.Format("%.3f", velTargetVel*360.);
 	SetDlgItemText(IDC_EDIT_VEL_VEL_DEG_S, szData);
@@ -971,10 +997,11 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
 	else//Velocity mode starts
 	{
 		//Get Velocity in RPM
-		GetDlgItemText(IDC_EDIT_VEL_VEL_RPM, szText);
-		velTargetVel = atof(szText);
-
-		setVelTargetVelValue((float)velTargetVel, IDC_EDIT_VEL_VEL_RPM);
+		//GetDlgItemText(IDC_EDIT_VEL_VEL_RPM, szText);
+		//velTargetRPM		= atof(szText);//[rpm]
+		velTargetRPM		= GetDlgItemInt(IDC_EDIT_VEL_VEL_RPM);//[rpm]
+		velTargetVel		= velTargetRPM / 60.0;//[rev/s]
+		velTargetVelValue	= velTargetRPM + 7500;//[rpm]+7500
 		
 		//Set Profiler limits
 		float fLoopMaxVel = 20.0;
@@ -989,33 +1016,16 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
 	velRunning = !velRunning;
 }
 
-void CRSSMotorCtrlDlg::setVelTargetVelValue(float vel, int mode) {
-
-	int incrementsPerLoop = 2048; //increments(counts) per loop
-	
-	switch (mode) {
-		case IDC_EDIT_VEL_VEL_RPM:
-			velTargetVelValue = (int)vel / 60;// [rev/s]
-			if (velTargetVelValue > 1000)
-				velTargetVelValue = 1;// 100 inc/second is the minimum velocity by default
-			else if (velTargetVelValue < -1000)
-				velTargetVelValue = -1;// 100 inc/second is the minimum velocity by default
-			break;
-		default:
-			break;
-	}
-}
-
 void CRSSMotorCtrlDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
-	if (pScrollBar == (CScrollBar *)&scPosition)
+	if (pScrollBar == (CScrollBar *)&scVelocity)
 	{
-		velTargetVelValue = scPosition.GetPos();
+		velTargetVel = (float)scVelocity.GetPos();//instead of velTargetVelValue
 		UpdateVelMotionValues();
 	}
-	else if (pScrollBar == (CScrollBar *)&scAmplitude)
+	else if (pScrollBar == (CScrollBar *)&scAcceleration)
 	{
-		velTargetAccValue = scAmplitude.GetPos();
+		velTargetAccValue = scAcceleration.GetPos();
 		UpdateVelMotionValues();
 	}
 
@@ -1024,10 +1034,14 @@ void CRSSMotorCtrlDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar
 
 void CRSSMotorCtrlDlg::UpdateVelMotionValues()
 {
-	velTargetRPM = velTargetVelValue - 7500;
-	velTargetVel = velTargetRPM * 2 * CV_PI / (gearFactor*60.0);
-	velTargetAcc = (velTargetAccValue - 2500)*CV_PI / 1800.0;
+	velTargetRPM		= velTargetVel * 60;
+	velTargetVelValue	= velTargetRPM + 7500;
+	velTargetAcc		= (velTargetAccValue - 2500)*CV_PI / 1800.0;
 
-
+	//old
+	//velTargetRPM = velTargetVelValue - 7500;
+	//velTargetVel = velTargetRPM * 2 * CV_PI / (gearFactor*60.0);
+	//velTargetAcc = (velTargetAccValue - 2500)*CV_PI / 1800.0;
+	
 	UpdateVelMotionInterface();
 }

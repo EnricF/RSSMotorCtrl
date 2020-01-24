@@ -43,6 +43,7 @@
 #define IDC_CHECK_VEL_ALL               1032
 #define IDC_STATIC_PARAM                1032
 #define IDC_BUTTON_VEL_START            1033
+#define IDC_STATIC_RAMP2                1034
 #define IDC_STATIC_PARAM_ACTUAL         1035
 #define IDC_STATIC_PARAM_TARGET         1036
 #define IDC_STATIC_PARAM_MAX            1037
@@ -63,6 +64,7 @@
 #define IDC_EDIT_PARAM_T_TARGET         1052
 #define IDC_EDIT_PARAM_ACC_MAX2         1053
 #define IDC_EDIT_PARAM_T_MAX            1053
+#define IDC_STATIC_RAMP3                1054
 
 // Next default values for new objects
 // 
@@ -70,7 +72,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        130
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1035
+#define _APS_NEXT_CONTROL_VALUE         1055
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

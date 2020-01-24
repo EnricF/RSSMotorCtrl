@@ -4552,7 +4552,7 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 	}
 }
 
-bool CecmTest::MotionFProfileVelMode(float fProfileVel) {
+bool CecmTest::MotionFProfileVelMode(float fProfileVel_rev_s) {
 	
 	//Commands matrix (STATIC!)
 	static commandsMatrix ProfileVelMatrix[numCommandsProfileVel] = {
@@ -4575,7 +4575,7 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel) {
 			else {
 				//ecmCpuToLe(ProfileVelMatrix[iCommandProfilePos].PDOpointer, &fTargetVel, (const uint8_t *)"\x04\x00");//TODO : It is not working, why?
 
-				ecmCpuToLe(&LEbuffer[0], &fProfileVel, (const uint8_t *)"\x04\x00");
+				ecmCpuToLe(&LEbuffer[0], &fProfileVel_rev_s, (const uint8_t *)"\x04\x00");
 				*ProfileVelMatrix[iCommandProfileVel].PDOpointer = LEbuffer[0];
 				*(ProfileVelMatrix[iCommandProfileVel].PDOpointer + 1) = LEbuffer[1];
 				*(ProfileVelMatrix[iCommandProfileVel].PDOpointer + 2) = LEbuffer[2];
@@ -4595,7 +4595,7 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel) {
 
 }
 
-bool CecmTest::MotionFVelMode(int iTargetVel) {
+bool CecmTest::MotionFVelMode(int iTargetVel_inc_s) {
 //bool CecmTest::MotionFVelMode(float fTargetVel) {
 
 	//Commands matrix (STATIC!)
@@ -4619,7 +4619,7 @@ bool CecmTest::MotionFVelMode(int iTargetVel) {
 			else {
 				//ecmCpuToLe(ProfileVelMatrix[iCommandProfilePos].PDOpointer, &fTargetVel, (const uint8_t *)"\x04\x00");//TODO : It is not working, why?
 
-				ecmCpuToLe(&LEbuffer[0], &iTargetVel, (const uint8_t *)"\x04\x00");
+				ecmCpuToLe(&LEbuffer[0], &iTargetVel_inc_s, (const uint8_t *)"\x04\x00");
 				*VelMatrix[iCommandVel].PDOpointer		= LEbuffer[0];
 				*(VelMatrix[iCommandVel].PDOpointer + 1)	= LEbuffer[1];
 				*(VelMatrix[iCommandVel].PDOpointer + 2)	= LEbuffer[2];
