@@ -99,9 +99,12 @@ class CecmTest {
 		void MotionStop(void);
 
 		// Device Parameters GETTERS
-		short		GetStatus(void);//CiA register
-		static int	GetActPos(void);//CiA register
-		static int	GetActVel(void);//CiA register
+		short			GetStatus(void);//CiA register
+		static int		GetActPos(void);//CiA register
+		static int		GetActVel(void);//CiA register
+		static float	GetTemperaturePrimary(void);//Axis1 register
+		static float	GetTemperatureMotor(void);	//Axis1 register
+		static float	GetRotorActPos(void);		//Axis1 register
 
 		// Device Parameters SETTERS
 		/*

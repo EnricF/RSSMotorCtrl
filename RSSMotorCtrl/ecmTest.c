@@ -516,6 +516,9 @@ static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer					(Ci
 static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer					(CiA)
 static uint8_t *pucDio_DisplayOperationMode = NULL;//"Operation mode display" pointer		(CiA)
 static uint8_t *pucDio_PrimaryTemperature	= NULL;//"Primary temperature value" pointer	(Axis1)
+static uint8_t *pucDio_MotorTemperature		= NULL;//"Motor temperature value" pointer		(Axis1)
+static uint8_t *pucDio_RotorPositionActual	= NULL;//"BISS-C slave 1 / Primary SSI-Position" pointer (Axis1)
+static uint8_t *pucDio_LastError			= NULL;//"Last error" pointer					(Axis1)
 static uint8_t *pucDio_StatusWord2			= NULL;//"Status mode" pointer					(Axis1)
 
 //----------------
@@ -2624,7 +2627,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_StatusWord);
 		if (result != ECM_SUCCESS) {
-			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+			fprintf(ECMlogFile, "Failed to get reference to variable Statusword\n");
 		}
 	}	
 
@@ -2635,7 +2638,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_PositionActual);
 		if (result != ECM_SUCCESS) {
-			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+			fprintf(ECMlogFile, "Failed to get reference to variable Position actual\n");
 		}
 	}
 
@@ -2646,7 +2649,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_VelocityActual);
 		if (result != ECM_SUCCESS) {
-			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+			fprintf(ECMlogFile, "Failed to get reference to variable Velocity actual\n");
 		}
 	}
 
@@ -2657,20 +2660,44 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_OperationModeAxis1);
 		if (result != ECM_SUCCESS) {
-			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+			fprintf(ECMlogFile, "Failed to get reference to variable Mode of operation display\n");
 		}
 	}
 
-	//Get Mode of operation (display) (CiA)
+	//Get Primary Temperature (Axis1)
 	result = ecmLookupVariable(hndMaster, "Primary temperature value", &VarDesc,
 		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
 	if (ECM_SUCCESS == result) {
 		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_PrimaryTemperature);
 		if (result != ECM_SUCCESS) {
-			fprintf(ECMlogFile, "Failed to get reference to virtual variable WcState\n");
+			fprintf(ECMlogFile, "Failed to get reference to variable Primary temperature\n");
 		}
 	}
+
+	//Get Motor Temperature (Axis1)
+	result = ecmLookupVariable(hndMaster, "Motor temperature value", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_MotorTemperature);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to variable Motor temperature\n");
+		}
+	}
+
+	//Get ROTOR position (BISS-C slave 1, Primary SSI-Position) (Axis1)
+	result = ecmLookupVariable(hndMaster, "BiSS-C slave 1 / Primary SSI - Position", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_RotorPositionActual);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to variable Motor temperature\n");
+		}
+	}
+
+	
 
     /*
      * Get reference to process variables
@@ -2685,10 +2712,8 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
         }
     }
 
-
-	//EF mod
 	/*
-	* This example tries to read a PDO mapping variable
+	* --------------------Read PDO outputs mapping variables section -------------------
 	*/
 
 	/*
@@ -4523,6 +4548,9 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 		pucDio_ControlWord + 1,	0x00,//Clear new set-poing flag
 	};*/
 
+	//Set Profiler Position operation mode
+	*pucDio_OperationModeAxis1 = PROFILE_POS_M;
+
 	if ( iCommandProfilePos < (numCommandsProfilePos) ) {
 
 		if ( decimator > 10 ) {
@@ -4564,6 +4592,9 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel_rev_s) {
 		pucDio_VelocitySetPoint,	0x00,//VELOCITY SET-POINT
 		pucDio_ControlWordAxis1+1,	0x02,//Two bytes PROFILE MOTION command: 2nd byte
 	};
+
+	//Set Profiler Velocity operation mode
+	*pucDio_OperationModeAxis1 = PROFILE_VEL_M;
 
 	if (iCommandProfileVel < (numCommandsProfileVel)) {
 
@@ -4608,6 +4639,9 @@ bool CecmTest::MotionFVelMode(int iTargetVel_inc_s) {
 		pucDio_TargetVelocity,	0x00,//VELOCITY TARGET
 		pucDio_ControlWord+1,	0x08,//Two bytes MOTION command: 2nd byte
 	};
+
+	//Set Velocity operation mode
+	*pucDio_OperationMode = VEL_M;
 
 	if (iCommandVel < (numCommandsVel)) {
 
@@ -4685,11 +4719,49 @@ int CecmTest::GetActVel(void) {
 
 	if (pucDio_VelocityActual != NULL) {
 		ecmCpuToLe(&actVel, pucDio_VelocityActual, (const uint8_t *)"\x04\x0");
-		return ( (float)actVel/1000 );
+		return ( actVel );
 	}
 	else
 		return 0;
 }
+
+
+float CecmTest::GetTemperaturePrimary(void) {
+	static float priTemperature;
+
+	if (pucDio_PrimaryTemperature != NULL) {
+		ecmCpuToLe(&priTemperature, pucDio_PrimaryTemperature, (const uint8_t *)"\x04\x0");
+		return (priTemperature);
+	}
+	else
+		return 0;
+}
+
+float CecmTest::GetTemperatureMotor(void) {
+	static float motorTemperature;
+
+	if (pucDio_PrimaryTemperature != NULL) {
+		ecmCpuToLe(&motorTemperature, pucDio_MotorTemperature, (const uint8_t *)"\x04\x0");
+		return (motorTemperature);
+	}
+	else
+		return 0;
+}
+
+// 8192 counts/loop
+// gear 1200?
+
+float CecmTest::GetRotorActPos(void) {
+	static int rotorPosition;
+
+	if (pucDio_RotorPositionActual != NULL) {
+		ecmCpuToLe(&rotorPosition, pucDio_RotorPositionActual, (const uint8_t *)"\x04\x0");
+		return (rotorPosition);
+	}
+	else
+		return 0;
+}
+
 
 //---------
 // SETTERS
@@ -4720,6 +4792,8 @@ void CecmTest::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
 	SetProfilerMaxAcc(*fLoopMaxAcc);
 	SetProfilerMaxDec(*fLoopMaxAcc);
 }
+
+
 
 /******************************************************************************/
 /*             OS and/or platform specific initialization code                */

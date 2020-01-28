@@ -75,6 +75,7 @@ void CRSSMotorCtrlDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_SLIDER_VEL_VEL, scVelocity);
 	DDX_Control(pDX, IDC_SLIDER_VEL_ACC, scAcceleration);
+	DDX_Control(pDX, IDC_COMBO_RAMP_UP_UNITS, cmbRampUpUnitsSel);
 }
 
 BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
@@ -118,7 +119,8 @@ UINT ThreadInterface(LPVOID pParam)
 		pObject->ShowParameter(DEV_MPOS);
 		pObject->ShowParameter(DEV_MVEL);
 		pObject->ShowParameter(DEV_MACC);
-		//pObject->ShowParameter(DEV_TEMP);
+		pObject->ShowParameter(DEV_TEMP);
+		pObject->ShowParameter(DEV_MTEMP);
 	}
 
 	//Finish Thread
@@ -218,8 +220,7 @@ UINT ThreadWorker(LPVOID pParam)
 		pObject->fLoopPos = (float)( pObject->motorParameters[BETH_PARAM_AR_ACTIPOS] * 2.0*CV_PI / (2048.0) );
 		pObject->iLoopPos = pObject->dDevData[DEV_POS][DEV_ACT];
 
-
-
+		
 		//Update Timings
 		//pObject->UpdateTimings();
 
@@ -284,6 +285,9 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
+
+	//Load list boxes
+	LoadComboBox();
 
 	//Init Device Data
 	InitDevData();
@@ -409,41 +413,67 @@ void CRSSMotorCtrlDlg::ShowParameter(int id)
 {
 	CString szInfo;
 
-	//if (id < DEV_IND)//temporal mod, for testing purposes only
-	if (id < 7)//undo this mod ASAP
-	{
-		
-		//Show Actual, Min and Max values in degrees
-		if (id == DEV_MPOS) { 
-			szInfo.Format("%.1f", dDevData[id][DEV_ACT] * 360.f / dDevData[id][DEV_RANGE]); 
-			SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
-		}
-		////else szInfo.Format( "%.1f", dDevData[id][DEV_ACT]*360.f/dDevData[id][DEV_RANGE] ); SetDlgItemText( IDC_EPA1+id-1, szInfo );
-		else {
-			szInfo.Format("%.3f", dDevData[id][DEV_ACT]); 
-			SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
-		}
-		if (id == DEV_MVEL) { 
-			szInfo.Format("%.1f", dDevData[id][DEV_ACT]);
-			SetDlgItemText(IDC_EPA1 + id - 1, szInfo); }
-		if (id == DEV_MACC) { 
-			szInfo.Format("%.1f", dDevData[id][DEV_ACT]);
-			SetDlgItemText(IDC_EPA1 + id - 1, szInfo); }
+	static int decimator = 0;
 
-		szInfo.Format("%.1f", dDevData[id][DEV_MIN] * 360.f / dDevData[id][DEV_RANGE]); SetDlgItemText(IDC_EPMIN1 + id - 1, szInfo);
-		szInfo.Format("%.1f", dDevData[id][DEV_MAX] * 360.f / dDevData[id][DEV_RANGE]); SetDlgItemText(IDC_EPMAX1 + id - 1, szInfo);
+	static ULONGLONG tnow, tprev = GetTickCount64();
 
-		szInfo.Format("%.1f", dDevData[id][DEV_TARGET]); SetDlgItemText(IDC_EPTARGET1 + id - 1, szInfo);
-	}
-	else
-	{
-		//Show Actual, Min and Max values in ticks
-		szInfo.Format("%.1f", dDevData[id][DEV_ACT]); SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
-		szInfo.Format("%.1f", dDevData[id][DEV_MIN]); SetDlgItemText(IDC_EPMIN1 + id - 1, szInfo);
-		szInfo.Format("%.1f", dDevData[id][DEV_MAX]); SetDlgItemText(IDC_EPMAX1 + id - 1, szInfo);
+	tnow = GetTickCount64();
+
+	//typical resolution in range 10:16 ms
+	if ( (tnow - tprev) > 10) {
+		tprev = tnow; //update
+
+		//if (id < DEV_IND)//temporal mod, for testing purposes only
+		if (id < 7)//undo this mod ASAP
+		{
+
+			//Show Actual, Min and Max values in degrees
+			if (id == DEV_MPOS) {
+				szInfo.Format("%.1f", dDevData[id][DEV_ACT] * 360.f / dDevData[id][DEV_RANGE]);
+				SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
+			}
+			////else szInfo.Format( "%.1f", dDevData[id][DEV_ACT]*360.f/dDevData[id][DEV_RANGE] ); SetDlgItemText( IDC_EPA1+id-1, szInfo );
+			else {
+				szInfo.Format("%.3f", dDevData[id][DEV_ACT]);
+				SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
+			}
+			if (id == DEV_MVEL) {
+				szInfo.Format("%.1f", dDevData[id][DEV_ACT]);
+				SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
+			}
+			if (id == DEV_MACC) {
+				szInfo.Format("%.1f", dDevData[id][DEV_ACT]);
+				SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
+			}
+
+			szInfo.Format("%.1f", dDevData[id][DEV_MIN] * 360.f / dDevData[id][DEV_RANGE]); SetDlgItemText(IDC_EPMIN1 + id - 1, szInfo);
+			szInfo.Format("%.1f", dDevData[id][DEV_MAX] * 360.f / dDevData[id][DEV_RANGE]); SetDlgItemText(IDC_EPMAX1 + id - 1, szInfo);
+
+			szInfo.Format("%.1f", dDevData[id][DEV_TARGET]); SetDlgItemText(IDC_EPTARGET1 + id - 1, szInfo);
+		}
+		else
+		{
+			//Temporally disabled until GUI is complete
+			//Show Actual, Min and Max values in ticks
+			//szInfo.Format("%.1f", dDevData[id][DEV_ACT]); SetDlgItemText(IDC_EPA1 + id - 1, szInfo);
+			//szInfo.Format("%.1f", dDevData[id][DEV_MIN]); SetDlgItemText(IDC_EPMIN1 + id - 1, szInfo);
+			//szInfo.Format("%.1f", dDevData[id][DEV_MAX]); SetDlgItemText(IDC_EPMAX1 + id - 1, szInfo);
+
+			if (id == DEV_TEMP) {
+				szInfo.Format("%.1f", dDevData[DEV_TEMP][DEV_ACT]);
+				SetDlgItemText(IDC_EDIT_PARAM_T_ACT, szInfo);
+			}
+
+			if (id == DEV_MTEMP) {
+				szInfo.Format("%.1f", dDevData[DEV_MTEMP][DEV_ACT]);
+				SetDlgItemText(IDC_EDIT_PARAM_TM_ACT, szInfo);
+			}
+			//motorParameters[BETH_PARAM_AR_ACT_FTEMP] = (double)cecmTest.GetTemperatureMotor();
+
+		}
+
 	}
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////
 //									DEVICE DATA										//
@@ -534,6 +564,7 @@ void CRSSMotorCtrlDlg::InitDevData()
 	bMotorAddTemps = false;
 	//bCalibPosition = false;
 
+
 	InitLoopSM();
 
 	//Status Variables
@@ -561,15 +592,43 @@ void CRSSMotorCtrlDlg::InitDevData()
 	motorAddTemps[6] = 0.0;
 }
 
+void CRSSMotorCtrlDlg::setLoopValue(int id_editbox, float * var) {
+	CString szText;
+
+	GetDlgItemText(id_editbox, szText);
+	if (cmbRampUpUnitsSel.GetCurSel() == COUNTS) {
+		*var = (float)(atof(szText));	//[encoder absolute position]
+	}
+	else if (cmbRampUpUnitsSel.GetCurSel() == RADIANS) {//RADIANS 
+		*var = (float)(atof(szText)*ENC_MOTOR_DR / (2 * CV_PI));	//[encoder absolute position]
+	}
+	else {//COUNTS by defaults (no more options by now)
+		*var = (float)(atof(szText));	//[encoder absolute position]
+	}
+}
+/*
+void CRSSMotorCtrlDlg::setLoopInitialValue() {
+	CString szText;
+	//Get target position, velocity and acceleration 
+	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);
+	if (cmbRampUpUnitsSel.GetCurSel() == COUNTS) {
+		fLoopInitial = (float)(atof(szText));	//[encoder absolute position]
+	}
+	else if (cmbRampUpUnitsSel.GetCurSel() == RADIANS) {//RADIANS 
+		fLoopInitial = (float)(atof(szText)*ENC_MOTOR_DR/(2*CV_PI));	//[encoder absolute position]
+	}
+	else {//COUNTS by defaults (no more options by now)
+		fLoopInitial = (float)(atof(szText));	//[encoder absolute position]
+	}
+}*/
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 {
 	CString szText;
 
-	//Get target position, velocity and acceleration 
-	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	
-	fLoopInitial	= (float)(atof(szText));	//[encoder absolute position]
-	iLoopTargetPos	= (int)( fLoopInitial*2048./(2.*CV_PI) );
+	setLoopValue(IDC_EDIT_RAMP_INITIALPOS, &fLoopInitial);//also used as a single-step motion
+	iLoopTargetPos	= (int)fLoopInitial;//Set TargetPos in [encoder absolute counts]
+
 	//fLoopTargetPos	= (float)(atof(szText)*CV_PI / 180.f);	//old example in [rad]
 
 	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
@@ -601,7 +660,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 			{
 				iLoopState = LOOP_STATE_GO_UPPER;
 				//fLoopTargetPos = (float)(fLoopUpper*CV_PI / 180.f);//old
-				iLoopTargetPos = (int)( fLoopUpper*2048. / (2.*CV_PI) );
+				iLoopTargetPos = (int)fLoopUpper;
 				iDelayCounter = 0;
 				bSendLoopCommand = true;
 			}
@@ -619,7 +678,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 			{
 				iLoopState = LOOP_STATE_GO_INITIAL_FU;
 				//fLoopTargetPos = (float)(fLoopInitial*CV_PI / 180.f);
-				iLoopTargetPos = (int)(fLoopInitial*2048. / (2.*CV_PI));
+				iLoopTargetPos = (int)fLoopInitial;
 				iDelayCounter = 0;
 				bSendLoopCommand = true;
 			}
@@ -647,7 +706,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 		{
 			iLoopState = LOOP_STATE_GO_LOWER;
 			//fLoopTargetPos = (float)(fLoopLower*CV_PI / 180.f);
-			iLoopTargetPos = (int)(fLoopLower*2048. / (2.*CV_PI));
+			iLoopTargetPos = (int)fLoopLower;
 			iDelayCounter = 0;
 			bSendLoopCommand = true;
 		}
@@ -664,7 +723,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 			{
 				iLoopState = LOOP_STATE_GO_INITIAL_FL;
 				//fLoopTargetPos = (float)(fLoopInitial*CV_PI / 180.f);
-				iLoopTargetPos = (int)(fLoopInitial*2048. / (2.*CV_PI));
+				iLoopTargetPos = (int)fLoopInitial;
 				iDelayCounter = 0;
 				bSendLoopCommand = true;
 			}
@@ -673,7 +732,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 	}
 	case LOOP_STATE_GO_INITIAL_FL:
 	{
-		if (fabs(iLoopTargetPos - iLoopPos) < LOOP_MIN_ERROR)
+		if (abs(iLoopTargetPos - iLoopPos) < LOOP_MIN_ERROR)
 		{
 			iDelayCounter++;
 			if (iDelayCounter >= iLoopDelay)
@@ -691,7 +750,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 		{
 			iLoopState = LOOP_STATE_GO_UPPER;
 			//fLoopTargetPos = (float)(fLoopUpper*CV_PI / 180.f);
-			iLoopTargetPos = (int)(fLoopUpper*2048. / (2.*CV_PI));
+			iLoopTargetPos = (int)fLoopUpper;
 			iDelayCounter = 0;
 			bSendLoopCommand = true;
 		}
@@ -772,33 +831,8 @@ void CRSSMotorCtrlDlg::ExecuteVelMotionControl()
 ////////////////////////////////////////////////////////////////
 
 void CRSSMotorCtrlDlg::GetDevices()
-{/*
-	unsigned int serial;
-	CString szDevice;
-
-	//Default
-	iCanId = 0;
-	iCan2Id = 0;
-	iSerial = 0;
-	serial = 0;
-
-	//Detect can bus devices
-	for (int i = 0; i < 31; i++)
-	{
-		if (i != 14 && i != 15 && i != 24 && i != 25)
-		{
-			if (cCanESD.GetDefSerial(i, serial))
-			{
-				iCanId = i;
-				iSerial = serial;
-
-				szDevice.Format("%02d - %d ", i, serial);
-
-				cbDevices.AddString(szDevice);
-				cbDevices.SetCurSel(0);
-			}
-		}
-	}*/
+{
+	//TODO
 }
 
 void CRSSMotorCtrlDlg::GetDefaultDeviceParameters()
@@ -814,13 +848,13 @@ void CRSSMotorCtrlDlg::ExecuteCommands()
 	/*SetModuleZero();
 
 	//Set Rotor Zero Offset
-	SetRotorZero();
+	SetRotorZero();*/
 
 	//Set Gear Ratio
 	SetGearRatio();
 
 	//Set CAN1Id Command
-	SetCAN1Id();
+	/*SetCAN1Id();
 
 	//Set CAN1Id Command
 	SetCAN2Id();
@@ -905,13 +939,13 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 	_itoa((int)dDevData[DEV_STATUS][DEV_ACT], &pBuffer8[2], 16);
 	SetDlgItemText(IDC_EDIT_DEV_STATUS, pBuffer8);//temporally done here, to be moved out!
 	
-	dDevData[DEV_POS][DEV_ACT]		= (double)cecmTest.GetActPos();//CiA register
+	//dDevData[DEV_POS][DEV_ACT]		= (double)cecmTest.GetActPos();//CiA register
 	//int actPos = cecmTest.GetActPos();//CiA register
 	//char pBuffer2[16];
 	//_itoa(actPos, pBuffer2, 10);
 	//SetDlgItemText(IDC_EDIT_PARAM_POS_ACT, pBuffer2);
 
-	dDevData[DEV_VEL][DEV_ACT]		= (double)cecmTest.GetActVel();
+	//dDevData[DEV_VEL][DEV_ACT]		= (double)cecmTest.GetActVel();
 	//int actVel = cecmTest.GetActVel();//CiA register
 	//char pBuffer3[16];
 	//_itoa(actVel, pBuffer3, 10);
@@ -922,11 +956,11 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 	//old example (using a boleean array)
 	//if (bPriSec[IFACE_PRI_SEC_MOTOR_POS]) cCanESD.GetActPos(iCanId, motorParameters[BCAN_PARAM_AR_ACTPOS]);
 
-	motorParameters[BETH_PARAM_AR_ACTPOS]		= cecmTest.GetActPos();
+	motorParameters[BETH_PARAM_AR_ACTPOS]		= (double)cecmTest.GetActPos();
 	//motorParameters[BETH_PARAM_AW_TARGET_POS]	= cecmTest.GetTargetPos();
 	motorParameters[BETH_PARAM_AW_TARGET_POS]	= (double)iLoopTargetPos;//simplification
 
-	motorParameters[BETH_PARAM_AR_ACTVEL]		= cecmTest.GetActVel();
+	motorParameters[BETH_PARAM_AR_ACTVEL]		= (double)cecmTest.GetActVel();
 	//motorParameters[BETH_PARAM_AW_TARGET_VEL]	= cecmTest.GetTargetVel();
 	motorParameters[BETH_PARAM_AW_TARGET_VEL]	= velTargetVel;//simplification
 
@@ -934,23 +968,34 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 	motorParameters[BETH_PARAM_AR_ACTACC]		= fLoopMaxAcc;//simplification
 	//motorParameters[BETH_PARAM_AW_TARGET_ACC]	= cecmTest.GetTargetAcc();
 	motorParameters[BETH_PARAM_AW_TARGET_ACC]	= fLoopMaxAcc;//simplification
+
+	//Get+Set Actual Primary Temperature
+	//dDevData[DEV_TEMP][DEV_ACT] = (double)cecmTest.GetTemperaturePrimary();
+	motorParameters[BETH_PARAM_AR_ACT_TEMP]		= (double)cecmTest.GetTemperaturePrimary();
+	motorParameters[BETH_PARAM_AR_ACT_FTEMP]	= (double)cecmTest.GetTemperatureMotor();
+
+	
+	motorParameters[BETH_PARAM_AR_ACTROTORPOS]	= (double)cecmTest.GetRotorActPos();
+
 }
 
 
 void CRSSMotorCtrlDlg::UpdateInterfaceParameters()
 {
 	CString szState;
-
 	////////////////
-	// ROTOR
+	// ROTOR (wheel?)
 
 	//Actual values
-	UpdateValue(DEV_MPOS, (double)cecmTest.GetActPos());//Range: 0..2048 (11 bits) ticks, up to 12 bits 
-	UpdateValue(DEV_MVEL, (double)cecmTest.GetActVel());//Range: 0..20	[rev/s]
+	UpdateValue(DEV_MPOS, (double)(double)cecmTest.GetRotorActPos());//Range: 0..2048 (11 bits) ticks, up to 12 bits 
+	UpdateValue(DEV_MVEL, 0.);//Range: 0..20	[rev/s]
 	//UpdateValue(DEV_MACC, cecmTest.GetActAcc());		//Range: 0..?	[rev/s^2]
 
+	#define fRotorToMotor	1048576	//testing 2^20;
+	#define GEAR						1200//1200:1 gear factor
+
 	//Target values
-	UpdateTargetValue(DEV_MPOS, (double)iLoopTargetPos);//Rotor target position
+	UpdateTargetValue(DEV_MPOS, (double)iLoopTargetPos / fRotorToMotor);//Rotor target position
 	UpdateTargetValue(DEV_MVEL, fLoopMaxVel);			//Rotor target Velocity
 	UpdateTargetValue(DEV_MACC, fLoopMaxAcc);			//Rotor target Acceleration
 
@@ -966,6 +1011,10 @@ void CRSSMotorCtrlDlg::UpdateInterfaceParameters()
 	UpdateTargetValue(DEV_POS, (double)iLoopTargetPos);
 	UpdateTargetValue(DEV_VEL, fLoopMaxVel);
 	UpdateTargetValue(DEV_ACC, fLoopMaxAcc);
+
+	//Actual Primary Temperature
+	UpdateValue(DEV_TEMP, (double)cecmTest.GetTemperaturePrimary());
+	UpdateValue(DEV_MTEMP, (double)(double)cecmTest.GetTemperatureMotor());
 }
 
 void CRSSMotorCtrlDlg::UpdateValue(int id, double value)
@@ -1012,16 +1061,15 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop()
 
 		iLoopState = LOOP_STATE_INITIAL;
 
-		//Going to initial position
-		//fLoopTargetPos = (float)(fLoopInitial*CV_PI / 180.f);
-
 		//Set PROFILER! Never forget to do this before any other EtherCAT command to the slave
 		cecmTest.SetProfiler(&fLoopMaxVel, &fLoopMaxAcc);
 
-		iLoopTargetPos = (int)( fLoopInitial*2048. / (2.*CV_PI) );
+		setLoopValue(IDC_EDIT_RAMP_LOWERPOS, &fLoopInitial);
+
+		//Update iLoopTargetPos [encoder absolute counts]
+		iLoopTargetPos = (int)fLoopInitial;
 
 		bSendLoopCommand = true;
-
 	}
 }
 
@@ -1035,12 +1083,13 @@ void CRSSMotorCtrlDlg::InitLoopSM()
 	bSendLoopCommand= false;
 
 	//Initial values
-	iLoopDelay		= 200;
-	fLoopUpper		= 2.*CV_PI;
-	fLoopInitial	= CV_PI;
+	iLoopDelay		= 50;
+	fLoopUpper		= ENC_MOTOR_DR;
+	fLoopInitial	= ENC_MOTOR_DR/2.;
 	fLoopLower		= 0.0;
-	fLoopMaxVel		= 20.0;
-	fLoopMaxAcc		= 20.0;
+	fLoopMaxVel		= 200.0;
+	fLoopMaxAcc		= 333.0;
+	gearFactor		= 1200.;
 
 	//Initial State
 	iLoopState		= LOOP_STATE_INITIAL;
@@ -1052,22 +1101,32 @@ void CRSSMotorCtrlDlg::InitLoopSM()
 	szText.Format("%.2f",	fLoopLower);	SetDlgItemText(IDC_EDIT_RAMP_LOWERPOS, szText);
 	szText.Format("%.2f",	fLoopMaxVel);	SetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
 	szText.Format("%.2f",	fLoopMaxAcc);	SetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);
+	szText.Format("%.0f",	gearFactor);	SetDlgItemText(IDC_EDIT_DEV_GFACTOR, szText);
+
+	cmbRampUpUnitsSel.SetCurSel(COUNTS);//selects default "0" which is [counts] units
+
+
 }
 
 void CRSSMotorCtrlDlg::UpdateLoopValues()
 {
 	CString szText;
 
-	float actLoopMaxVel;
-	float actLoopMaxAcc;
+	float actLoopMaxVel;//[rev/s]
+	float actLoopMaxAcc;//[rev/s^2]
 
 	//Load Initial values
 	GetDlgItemText(IDC_EDIT_RAMP_DELAY, szText);		iLoopDelay		= atoi(szText);
-	GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	fLoopInitial	= (float)atof(szText);
-	GetDlgItemText(IDC_EDIT_RAMP_UPPERPOS, szText);		fLoopUpper		= (float)atof(szText);
-	GetDlgItemText(IDC_EDIT_RAMP_LOWERPOS, szText);		fLoopLower		= (float)atof(szText);
-	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);		actLoopMaxVel	= (float)atof(szText);//[rev/s]
-	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);		actLoopMaxAcc	= (float)atof(szText);//[rev/s^2]
+
+	setLoopValue(IDC_EDIT_RAMP_INITIALPOS, &fLoopInitial);
+	//GetDlgItemText(IDC_EDIT_RAMP_INITIALPOS, szText);	fLoopInitial	= (float)atof(szText);
+	setLoopValue(IDC_EDIT_RAMP_UPPERPOS, &fLoopUpper);
+	//GetDlgItemText(IDC_EDIT_RAMP_UPPERPOS, szText);		fLoopUpper		= (float)atof(szText);
+	setLoopValue(IDC_EDIT_RAMP_LOWERPOS, &fLoopLower);
+	//GetDlgItemText(IDC_EDIT_RAMP_LOWERPOS, szText);		fLoopLower		= (float)atof(szText);
+
+	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);		actLoopMaxVel	= (float)atof(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);		actLoopMaxAcc	= (float)atof(szText);
 
 	//Get Interface Target Values
 	float auxfLoopMaxVel = (float)(actLoopMaxVel);//[rev/s]
@@ -1253,7 +1312,9 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRecData()
 		QueryPerformanceCounter((LARGE_INTEGER*)&recCurITime);
 
 		//Write Header Infor
-		CString szLine; szLine.Format("Sample\tAbsPos\tPos\tTarget\tError\tVel\tTVel\tParamA\tParamB\tParamC\tRawA\tRawB\tRawC\tRawM\tCurA\tCurB\tCurC\tCurT\tCurM\tPosM\tTPosM\tVelM\tTVelM\tAccM\tTAccM\tTimeStamp\r\n");
+		//CString szLine; szLine.Format("Sample\tAbsPos\tPos\tTarget\tError\tVel\tTVel\tParamA\tParamB\tParamC\tRawA\tRawB\tRawC\tRawM\tCurA\tCurB\tCurC\tCurT\tCurM\tPosM\tTPosM\tVelM\tTVelM\tAccM\tTAccM\tTimeStamp\r\n");
+		CString szLine; 
+		szLine.Format("Sample\tActPos[enc]\tTarPos[enc]\tActVel[mrev/s]\tTarVel[mrev/s]\tActAcc[mrev/s^2]\tTarAcc[mrev/s^2]\tPrimaryT[ºC]\tMotorT[ºC]\tTimeStamp\r\n");
 		curDataFile.Write(szLine.GetBuffer(), szLine.GetLength());
 
 		//Update Interface
@@ -1261,7 +1322,25 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRecData()
 	}
 }
 
+void CRSSMotorCtrlDlg::SetGearRatio()
+{
+	if (bSetGearRatio)
+	{
+		double gearRatio = 0;
+		CString szGearRatio;
 
+		GetDlgItemText(IDC_EDIT_DEV_GFACTOR, szGearRatio);
+
+		//Get Offset from interface
+		gearRatio = atof(szGearRatio);
+
+		//cCanESD.SetDefGearRatio(iCanId, gearRatio);
+		//cecmTest.SetDefGearRatio(gearRatio);
+
+		bSetGearRatio = false;
+	}
+
+}
 ////////////////////////////////////////////////////////////////
 // FUNCTION: RECORD INFORMATION								OK
 ////////////////////////////////////////////////////////////////
@@ -1290,73 +1369,50 @@ void CRSSMotorCtrlDlg::RecordDeviceData()
 
 	int timestamp = (int)((recCurATime - recCurITime)*1000.0 / freq);
 
-	//Calcule actual current			
-	//double cura = -0.0313*dcurrent[current_a] + 15.791;
-	//double curb = -0.0313*dcurrent[current_b] + 15.791;
-	//double curc = -0.0313*dcurrent[current_c] + 15.791;
-	//double curt = (cura + curb + curc) / 2;
-	//double curmod = dcurrent[current_m] * 0.0289 - 14.859;
 
-
-
-	/*CString szLine; szLine.Format("%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n",
-
-		recCurSample,														//Current sample	
-
-		motorParameters[BCAN_PARAM_AR_ACTIPOS],								//Absolute Rotor position in ticks
-		motorParameters[BCAN_PARAM_AR_ACTROTORPOS],							//Rotor position in ticks
-		motorParameters[BCAN_PARAM_AW_ACTROTORTARGETPOS],					//Rotor target position
-		motorParameters[BCAN_PARAM_AR_ACTROTORDELTAPOS],					//Position error
-
-		motorParameters[BCAN_PARAM_AR_ACTROTORVEL],							//Rotor velocity
-		motorParameters[BCAN_PARAM_AW_ACTROTORTARGETVEL],					//Rotor target velocity
-
-		motorParameters[BCAN_PARAM_AR_ACTROTORPARAM1],						//Param A
-		motorParameters[BCAN_PARAM_AR_ACTROTORPARAM2],						//Param B
-		motorParameters[BCAN_PARAM_AR_ACTROTORPARAM3],						//Param C
-
-		dCurrent[CURRENT_A],												//Current A RAW value
-		dCurrent[CURRENT_B],												//Current B RAW value
-		dCurrent[CURRENT_C],												//Current C RAW value
-		dCurrent[CURRENT_M],												//Current M RAW value
-
-		curA,																//Current A value in A
-		curB,																//Current B value in A
-		curC,																//Current C value in A
-		curT,																//Total Motors Current
-		curMod,																//Total Module Current
-
-		motorParameters[BCAN_PARAM_AR_ACTPOS],								//Actual Module Position
-		motorParameters[BCAN_PARAM_AW_TARGET_POS],							//Actual Module Target Position
-
-		motorParameters[BCAN_PARAM_AR_ACTVEL],								//Actual Module Velocity
-		motorParameters[BCAN_PARAM_AW_TARGET_VEL],							//Actual Module Velocity
-
-		motorParameters[BCAN_PARAM_AR_ACTACC],								//Actual Module Velocity
-		motorParameters[BCAN_PARAM_AW_TARGET_ACC],							//Actual Module Velocity
-
-		timestamp);														//Time stamp
-	*/
-
-	CString szLine; szLine.Format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n",
+	CString szLine; szLine.Format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n",
 
 		recCurSample,													//Current sample	
 		motorParameters[BETH_PARAM_AR_ACTPOS],							//Actual Module Position
 		motorParameters[BETH_PARAM_AW_TARGET_POS],						//Actual Module Target Position
 
 		motorParameters[BETH_PARAM_AR_ACTVEL],							//Actual Module Velocity
-		motorParameters[BETH_PARAM_AW_TARGET_VEL],						//Actual Module Velocity
+		motorParameters[BETH_PARAM_AW_TARGET_VEL],						//Actutal Module Target Velocity
 
-		motorParameters[BETH_PARAM_AR_ACTACC],							//Actual Module Velocity
-		motorParameters[BETH_PARAM_AW_TARGET_ACC],						//Actual Module Velocity
+		motorParameters[BETH_PARAM_AR_ACTACC],							//Actual Module Acceleration
+		motorParameters[BETH_PARAM_AW_TARGET_ACC],						//Actual Module Target Acceleration
+		motorParameters[BETH_PARAM_AR_ACT_TEMP],						//Actual Primary Temperature
+		motorParameters[BETH_PARAM_AR_ACT_FTEMP],						//Actual Motor Temperature?
+
 		timestamp);														//Time stamp
-//Write Data register
+	//Write Data register
 	curDataFile.Write(szLine.GetBuffer(), szLine.GetLength());
 
-	//Show information
-	//CString szDlgInfo;
-	//szDlgInfo.Format("%d - %.1f %.1f %.1f %.1f", recCurSample, dTemps[TEMP_T1], dTemps[TEMP_T2], dTemps[TEMP_T3], dTemps[TEMP_M]);
-	//SetDlgItemText(IDC_CONTROL_DATA, szDlgInfo);
+	//Show/Update record information
+	if (recCurSample % 10 == 0) {
+		CString szDlgInfo;
+		szDlgInfo.Format("%d - %llu[kB]", recCurSample, curDataFile.GetLength()/1000);
+		SetDlgItemText(IDC_EDIT_REC_FILENAME, szDlgInfo);
+	}
 
 	recCurSample++;
+}
+
+
+void CRSSMotorCtrlDlg::OnCbnSelchangeComboRampUpUnits()
+{
+	CString m_strItemSelected;
+
+	cmbRampUpUnitsSel.GetLBText(cmbRampUpUnitsSel.GetCurSel(), m_strItemSelected);
+	UpdateData(FALSE);
+
+}
+void CRSSMotorCtrlDlg::LoadComboBox() {
+	CString str = _T("");
+
+	str.Format(_T("[counts]"));
+	cmbRampUpUnitsSel.AddString(str);
+
+	str.Format(_T("[radians]"));
+	cmbRampUpUnitsSel.AddString(str);
 }

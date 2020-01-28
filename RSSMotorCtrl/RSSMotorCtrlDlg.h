@@ -6,7 +6,6 @@
 
 #include "ecmTest.h" //Add class header
 
-
 // CRSSMotorCtrlDlg dialog
 class CRSSMotorCtrlDlg : public CDialogEx
 {
@@ -90,11 +89,12 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_MPOS		4								//Device Motor Position
 		#define						DEV_MVEL		5								//Device Motor Velocity
 		#define						DEV_MACC		6								//Device Motor Acceleration
-		#define						DEV_AMP			7								//Device Module Temperature
+		#define						DEV_AMP			7								//Device Module Amplitude
 		#define						DEV_CUR			8								//Device Module Current			- Common to all drives/motors
+		#define						DEV_MTEMP		9								//Device Motor Temperature	
 		#define						DEV_TPC			9								//Device Module TPC cycle
-		#define						DEV_TPC_SEC		10								//Device Module TPC cycle secondary thread
-		#define						DEV_TEMP		10								//Device Module Amplitude
+		//#define						DEV_TPC_SEC		10								//Device Module TPC cycle secondary thread
+		#define						DEV_TEMP		10								//Device Module Temperature
 		#define						DEV_CTRL		11								//Device Module Control Parameters
 		#define						DEV_CAN			12								//Device Module CAN errors
 		#define						DEV_DELTAVEL	12								//Device Module CAN errors
@@ -159,6 +159,10 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		double						motorParameters[MAX_PARAMS];
 		int							lowPriorityParams;		//1: Set 1 | 2: Set2 
 
+		//ENCODERS dynamic ranges [counts/loop]: Motor and Rotor
+		#define ENC_MOTOR_DR 65535.	//16-bits
+		#define ENC_ROTOR_DR 8192.	//13-bits
+
 		//Auxiliar temperatures
 		#define MOTOR_AUX_TEMPS				7
 		#define MOTOR_AUX_TEMP_FRE			0
@@ -215,21 +219,21 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		bool						bLoopStart;
 		//EDIT BOXES
-		float						fLoopInitial;	//[absolute radians]
-		float						fLoopUpper;		//[absolute radians]
-		float						fLoopLower;		//[absolute radians]
+		float						fLoopInitial;	//[absolute encoder counts]
+		float						fLoopUpper;		//[absolute encoder counts]
+		float						fLoopLower;		//[absolute encoder counts]
 		int							iLoopDelay;
 		int							iLoopState;
 		
 
 		
 		#define						LOOP_MIN_ERROR				0.0017 //[rad]
-		#define						LOOP_MIN_ERROR_ENC			1 //[encoder counts]
+		#define						LOOP_MIN_ERROR_ENC			655 //[encoder counts]
 
 		float						fLoopPos;		//[absolute radians]
-		int							iLoopPos;		//[enconder absolute position]
+		int							iLoopPos;		//[encoder absolute position]
 		float						fLoopTargetPos;	//[absolute radians]
-		int							iLoopTargetPos;	//[enconder absolute position]
+		int							iLoopTargetPos;	//[encoder absolute position]
 		float						fLoopMaxVel;
 		float						fLoopMaxAcc;
 		
@@ -240,12 +244,16 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		int							iDelayCounter;
 
+		/*
+		* Initializes variables and EditBoxes related to "RAMP" GroupBox
+		*/
 		void						InitLoopSM();
-		//bool						LoopSM(double modulePos);//old, its param was never used (why?)
+
 		/*
 		* A Finite state machine switch() function. It controls RAMP motion (initial, upper, lower, upper, lower, ...)
 		*/
 		bool						LoopSM();
+		//bool						LoopSM(double modulePos);//old, its param was never used (why?)
 
 		/*
 		* 		To know if the user has changed GUI values on EditBoxes, work in progress.
@@ -254,6 +262,15 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						UpdateLoopValues();
 
 		void						ExecuteRampMotionControl();//RAMP mode
+		//void						setLoopInitialValue();
+
+		/*
+		* 		Takes a value from and edit box and sets its associated variable
+		*		It is able to read on different units selection
+		*		@param	id_editbox		EditBox Numerical ID
+		*		@param	var				Pointer to the variable to be written
+		*/
+		void						setLoopValue(int id_editbox, float * var);
 
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -272,6 +289,18 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						UpdateVelMotionValues();
 		void						ExecuteVelMotionControl();//VEL mode
 		void						UpdateVelMotionInterface();
+
+
+
+		//////////////////////////////////////////////////////////////////////////////////
+		//									COMMANDS									//
+		//////////////////////////////////////////////////////////////////////////////////
+
+		//void						SetModuleZero();
+		//void						SetRotorZero();
+		void						SetGearRatio();
+		//void						SetSerial();
+
 
 	// Construction
 	public:
@@ -312,4 +341,10 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg void OnBnClickedButtonVelSetVel();
 		afx_msg void OnBnClickedStaticRamp3();
 		afx_msg void OnBnClickedButtonRecData();
+
+		// Units selection in "Ramp motion - Upper Position" field
+		CComboBox cmbRampUpUnitsSel;
+		afx_msg void OnCbnSelchangeComboRampUpUnits();
+		afx_msg void LoadComboBox();
+		enum cmbUnits {	COUNTS, RADIANS	};
 };

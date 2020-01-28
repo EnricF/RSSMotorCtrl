@@ -61,6 +61,7 @@
 #define IDC_EPA5                        1047
 #define IDC_EPA6                        1048
 #define IDC_EDIT_PARAM_POS_TARGET       1049
+#define IDC_STATIC_PARAM_T2             1049
 #define IDC_EPTARGET1                   1050
 #define IDC_EPTARGET2                   1051
 #define IDC_EPTARGET3                   1052
@@ -68,6 +69,7 @@
 #define IDC_EPTARGET5                   1054
 #define IDC_EPTARGET6                   1055
 #define IDC_EDIT_PARAM_POS_MAX          1056
+#define IDC_STATIC_RAMP_MAXACC2         1056
 #define IDC_EPMIN1                      1057
 #define IDC_EPMIN2                      1058
 #define IDC_EPMIN3                      1059
@@ -75,17 +77,19 @@
 #define IDC_EPMIN5                      1061
 #define IDC_EPMIN6                      1062
 #define IDC_EDIT_PARAM_VEL_ACT          1063
+#define IDC_STATIC_DEV_GRATIO           1063
 #define IDC_EDIT_PARAM_VEL_TARGET       1064
 #define IDC_EDIT_PARAM_VEL_MAX          1065
 #define IDC_EDIT_PARAM_ACC_ACT          1066
+#define IDC_COMBO2                      1066
 #define IDC_EDIT_PARAM_ACC_TARGET       1067
 #define IDC_EDIT_PARAM_ACC_MAX          1068
 #define IDC_EDIT_PARAM_T_ACT            1069
 #define IDC_EDIT_PARAM_T_TARGET         1070
 #define IDC_EDIT_PARAM_ACC_MAX2         1071
-#define IDC_EDIT_PARAM_T_ACT2           1071
 #define IDC_EDIT_DEV_STATUS             1071
 #define IDC_EDIT_PARAM_T_MAX            1072
+#define IDC_EDIT_PARAM_T_MIN            1072
 #define IDC_STATIC_REC                  1073
 #define IDC_EDIT_REC_FILENAME           1074
 #define IDC_BUTTON_REC_DATA             1075
@@ -112,6 +116,9 @@
 #define IDC_EPMAX4                      1096
 #define IDC_EPMAX5                      1097
 #define IDC_EPMAX6                      1098
+#define IDC_EDIT_PARAM_TM_ACT           1099
+#define IDC_EDIT_DEV_GFACTOR            1100
+#define IDC_COMBO_RAMP_UP_UNITS         1101
 
 // Next default values for new objects
 // 
@@ -119,7 +126,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        131
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1059
+#define _APS_NEXT_CONTROL_VALUE         1067
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
