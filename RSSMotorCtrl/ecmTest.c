@@ -4673,6 +4673,10 @@ bool CecmTest::MotionFVelMode(int iTargetVel_inc_s) {
 
 }
 
+void CecmTest::StatusFaultReset(void) {
+	*pucDio_ControlWordAxis1 = 0x80;//dec: 128
+}
+
 void CecmTest::MotionStop(void) {
 
 	static const int numCommandsStop = 8;
@@ -4787,6 +4791,12 @@ void CecmTest::SetProfilerMaxDec(float fDec) {
 }
 
 //Sets Profiler limits
+
+/*
+*	@brief Sets Profiler limits
+*
+*	@param fLoopMaxVel	Profiler Max. Velocity in [rev/s]
+*/
 void CecmTest::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
 	SetProfilerMaxVel(*fLoopMaxVel);
 	SetProfilerMaxAcc(*fLoopMaxAcc);

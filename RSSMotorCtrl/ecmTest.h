@@ -98,6 +98,11 @@ class CecmTest {
 		*/
 		void MotionStop(void);
 
+		/*
+		* Resets (clear) STATUS FAULT bit (7th) by writing a decimal 128 in "Control Word" (Axis-1) register
+		*/
+		void StatusFaultReset(void);
+
 		// Device Parameters GETTERS
 		short			GetStatus(void);//CiA register
 		static int		GetActPos(void);//CiA register

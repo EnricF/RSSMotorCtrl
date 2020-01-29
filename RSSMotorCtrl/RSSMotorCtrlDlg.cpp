@@ -45,6 +45,8 @@ public:
 // Implementation
 protected:
 	DECLARE_MESSAGE_MAP()
+public:
+
 };
 
 CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
@@ -57,6 +59,7 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 }
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
+
 END_MESSAGE_MAP()
 
 
@@ -90,6 +93,9 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_WM_HSCROLL()
 	ON_BN_CLICKED(IDC_BUTTON_VEL_SET_VEL, &CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVel)
 	ON_BN_CLICKED(IDC_BUTTON_REC_DATA, &CRSSMotorCtrlDlg::OnBnClickedButtonRecData)
+	ON_BN_CLICKED(IDC_BUTTON_DEV_FAULT_RESET, &CRSSMotorCtrlDlg::OnBnClickedButtonDevFaultReset)
+	ON_BN_CLICKED(IDC_BUTTON_VEL_SET_VEL_ACC, &CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelAcc)
+	ON_BN_CLICKED(IDCANCEL, &CRSSMotorCtrlDlg::OnBnClickedCancel)
 END_MESSAGE_MAP()
 
 
@@ -218,7 +224,7 @@ UINT ThreadWorker(LPVOID pParam)
 		//Loop position
 		//pObject->fLoopPos = (float)(pObject->motorParameters[BETH_PARAM_AR_ACTIPOS] * 2.0*CV_PI / (pObject->gearFactor*2048.0));
 		pObject->fLoopPos = (float)( pObject->motorParameters[BETH_PARAM_AR_ACTIPOS] * 2.0*CV_PI / (2048.0) );
-		pObject->iLoopPos = pObject->dDevData[DEV_POS][DEV_ACT];
+		pObject->iLoopPos = (int) pObject->dDevData[DEV_POS][DEV_ACT];
 
 		
 		//Update Timings
@@ -309,12 +315,6 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 
 	//Record data initialization
 	InitRecordDeviceData();
-
-	// TODO: Add extra initialization here
-	scVelocity.SetRange(-20, 20, TRUE);
-	scVelocity.SetPos(0);
-	scAcceleration.SetRange(-20, 20, TRUE);
-	scAcceleration.SetPos(0);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -563,8 +563,7 @@ void CRSSMotorCtrlDlg::InitDevData()
 
 	bMotorAddTemps = false;
 	//bCalibPosition = false;
-
-
+	
 	InitLoopSM();
 
 	//Status Variables
@@ -590,6 +589,16 @@ void CRSSMotorCtrlDlg::InitDevData()
 	motorAddTemps[4] = 0.0;
 	motorAddTemps[5] = 0.0;
 	motorAddTemps[6] = 0.0;
+
+
+	//Set STATUS Semaphore picture to yellow (Start)
+	picStatusSemaphore.LoadBitmapA("res\\bitmap1.bmp");
+	
+	//Sliders controls
+	scVelocity.SetRange(-MOTOR_VEL_DR_REV_S/2, MOTOR_VEL_DR_REV_S/2, TRUE);
+	scVelocity.SetPos(0);
+	scAcceleration.SetRange(-MOTOR_ACC_DR_REV_S/2, MOTOR_ACC_DR_REV_S/2, TRUE);
+	scAcceleration.SetPos(0);
 }
 
 void CRSSMotorCtrlDlg::setLoopValue(int id_editbox, float * var) {
@@ -732,7 +741,7 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 	}
 	case LOOP_STATE_GO_INITIAL_FL:
 	{
-		if (abs(iLoopTargetPos - iLoopPos) < LOOP_MIN_ERROR)
+		if (abs(iLoopTargetPos - iLoopPos) < LOOP_MIN_ERROR_ENC)
 		{
 			iDelayCounter++;
 			if (iDelayCounter >= iLoopDelay)
@@ -741,7 +750,6 @@ bool CRSSMotorCtrlDlg::LoopSM(void)
 				iDelayCounter = 0;
 			}
 		}
-
 		break;
 	}
 	case LOOP_STATE_DELAY_FL:
@@ -929,15 +937,18 @@ void CRSSMotorCtrlDlg::ExecuteMotion()
 
 void CRSSMotorCtrlDlg::GetDeviceParameters()
 {
+	static short StatusAct = 0;
 	char pBuffer8[8];
-	char pBuffer16[16];
-	//double	dDevData[DEV_PARAMS][DEV_FIELDS];	//Device Data
+	//char pBuffer16[16];
 
 	//TODO : remove dDevData writings!!! They are done through UpdateValue() and UpdateTargetValue() calls
-	dDevData[DEV_STATUS][DEV_ACT]	= (double)cecmTest.GetStatus();//CiA register
+	StatusAct = cecmTest.GetStatus();//CiA register
+	dDevData[DEV_STATUS][DEV_ACT] = (double)StatusAct;//CiA register
 	sprintf(&pBuffer8[0], "0x");
 	_itoa((int)dDevData[DEV_STATUS][DEV_ACT], &pBuffer8[2], 16);
 	SetDlgItemText(IDC_EDIT_DEV_STATUS, pBuffer8);//temporally done here, to be moved out!
+
+	UpdateStatusSemaphore( &StatusAct );
 	
 	//dDevData[DEV_POS][DEV_ACT]		= (double)cecmTest.GetActPos();//CiA register
 	//int actPos = cecmTest.GetActPos();//CiA register
@@ -1033,12 +1044,41 @@ void CRSSMotorCtrlDlg::UpdateTargetValue(int id, double value)
 	dDevData[id][DEV_TARGET] = value;
 }
 
+void CRSSMotorCtrlDlg::UpdateStatusSemaphore(short * val) {
+
+	static short prev_val = 0;
+	static CStatic *pic = (CStatic *)GetDlgItem(IDC_STATIC_STATUS_SEMAPHORE);//Status Semaphore picture
+	static CStatic *but = (CStatic *)GetDlgItem(IDC_BUTTON_DEV_FAULT_RESET);//Fault Reset button
+
+	static HBITMAP hbit = (HBITMAP)::LoadImage(AfxGetInstanceHandle(), (LPCSTR)"res\\StatusSemaphoreGreen.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+
+	if (prev_val != *val) {
+
+		if (*val & (1 << 3)) {//FAULT
+			hbit = (HBITMAP)::LoadImage(AfxGetInstanceHandle(), (LPCSTR)"res\\StatusSemaphoreRed.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+			pic->SetBitmap(hbit);		
+			
+			but->ShowWindow(SW_SHOW);
+		}
+		else if (*val > 0) {//Any NON-FAULT value
+			hbit = (HBITMAP)::LoadImage(AfxGetInstanceHandle(), (LPCSTR)"res\\StatusSemaphoreGreen.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+			pic->SetBitmap(hbit);
+			if ( but->IsWindowVisible() )	but->ShowWindow(SW_HIDE);
+		}
+	}
+	//otherwise keeps YELLOW
+
+	prev_val = *val;//update it for next iteration
+}
 
 void CRSSMotorCtrlDlg::OnBnClickedOk()
 {
-	FinalizeControlThreads();
-	
-	CDialogEx::OnOK();
+	//Old stuff
+	//FinalizeControlThreads();
+	//CDialogEx::OnOK();
+
+	//New
+	CAboutDlg().DoModal();
 }
 
 
@@ -1147,8 +1187,39 @@ void CRSSMotorCtrlDlg::UpdateLoopValues()
 	//Always before MOTION starts!!
 }
 
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVel()
+{
+	CString szText;
+
+	if (velRunning) {
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
+	}
+	else {//Velocity mode starts
+
+		//Get control value	
+		GetDlgItemText(IDC_EDIT_VEL_VEL_DEG_S, szText);
+		velTargetVel = (float)(atof(szText));//[deg/s]
+		velTargetVel = velTargetVel / 360.;//[rev/s]
+		velTargetRPM = (int)velTargetVel * 60;//no gear, no [rad] units --> in [rpm] units
+		velTargetVelValue = velTargetRPM + 7500;	//TODO : why?
+
+		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
+		motionMode = DEV_M_VEL;
+	}
+	velRunning = !velRunning;
+
+	scVelocity.SetPos((int)velTargetVel);//update Slider control in [rev/s]
+
+	UpdateProfilerLimits();
+
+	UpdateVelMotionInterface();
+}
+
 void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm()
 {
+	CString szText;
+
 	if (velRunning){
 		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
 	}
@@ -1167,40 +1238,47 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelRpm()
 	//scVelocity.SetPos(velTargetVelValue);//TODO : why?
 	scVelocity.SetPos((int)velTargetVel);//[rev/s]
 
+	//Update Profiler limits from RAMP group box
+	UpdateProfilerLimits();
+
 	UpdateVelMotionInterface();
 }
 
-void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVel()
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelAcc()
 {
 	CString szText;
 
-	if (velRunning) {
-		SetDlgItemText(IDC_BUTTON_VEL_START, "Start");
-	}
-	else {//Velocity mode starts
+	// TODO: Add your control notification handler code here
+	SetDlgItemText(IDC_BUTTON_VEL_SET_VEL_ACC, "To be done");
 
-		//Get control value	
-		GetDlgItemText(IDC_EDIT_VEL_VEL_DEG_S, szText);
-		velTargetVel		= (float)(atof(szText));//[deg/s]
-		velTargetVel		= velTargetVel / 360.;//[rev/s]
-		velTargetRPM		= (int)velTargetVel * 60;//no gear, no [rad] units --> in [rpm] units
-		velTargetVelValue	= velTargetRPM + 7500;	//TODO : why?
-			   		 
-		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
-		motionMode = DEV_M_VEL;
-	}
-	velRunning = !velRunning;
+	//Set Profiler limits
+	GetDlgItemText(IDC_EDIT_VEL_ACC_DEG_S2, szText);
+	// TODO : Do something with Acceleration set by User
 
-	scVelocity.SetPos((int)velTargetVel);//[rev/s]
+	UpdateProfilerLimits();
 
 	UpdateVelMotionInterface();
+}
+
+void CRSSMotorCtrlDlg::UpdateProfilerLimits() {
+
+	CString szText;
+
+	//Get Profiler limits from user
+	GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
+	fLoopMaxVel = atof(szText);
+	GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);
+	fLoopMaxAcc = atof(szText);
+	//Send Profiler limits to drive (motor)
+	cecmTest.SetProfiler(&fLoopMaxVel, &fLoopMaxAcc);
 }
 
 void CRSSMotorCtrlDlg::UpdateVelMotionInterface()
 {
 	CString szData;
 
-	SetDlgItemInt(IDC_EDIT_VEL_VEL_RPM, velTargetVel*60.);
+	SetDlgItemInt(IDC_EDIT_VEL_VEL_RPM, (unsigned int) velTargetVel*60.);
 
 	szData.Format("%.3f", velTargetVel*360.);
 	SetDlgItemText(IDC_EDIT_VEL_VEL_DEG_S, szData);
@@ -1236,9 +1314,10 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelStart()
 		velTargetVelValue	= velTargetRPM + 7500;//[rpm]+7500
 		
 		//Set Profiler limits
-		float fLoopMaxVel = 20.0;
-		float fLoopMaxAcc = 20.0;
-
+		GetDlgItemText(IDC_EDIT_RAMP_MAXVEL, szText);
+		fLoopMaxVel = atof(szText);
+		GetDlgItemText(IDC_EDIT_RAMP_MAXACC, szText);
+		fLoopMaxAcc = atof(szText);
 		cecmTest.SetProfiler(&fLoopMaxVel, &fLoopMaxAcc);
 
 		SetDlgItemText(IDC_BUTTON_VEL_START, "Stop");
@@ -1339,7 +1418,6 @@ void CRSSMotorCtrlDlg::SetGearRatio()
 
 		bSetGearRatio = false;
 	}
-
 }
 ////////////////////////////////////////////////////////////////
 // FUNCTION: RECORD INFORMATION								OK
@@ -1415,4 +1493,18 @@ void CRSSMotorCtrlDlg::LoadComboBox() {
 
 	str.Format(_T("[radians]"));
 	cmbRampUpUnitsSel.AddString(str);
+}
+
+void CRSSMotorCtrlDlg::OnBnClickedButtonDevFaultReset(void){
+	cecmTest.StatusFaultReset();
+}
+
+
+void CRSSMotorCtrlDlg::OnBnClickedCancel()
+{
+	//New
+	FinalizeControlThreads();
+
+	//Old
+	CDialogEx::OnCancel();
 }

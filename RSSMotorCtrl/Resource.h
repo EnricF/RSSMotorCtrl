@@ -7,6 +7,12 @@
 #define IDS_ABOUTBOX                    101
 #define IDD_RSSMOTORCTRL_DIALOG         102
 #define IDR_MAINFRAME                   128
+#define IDB_BITMAP1                     134
+#define IDB_BITMAP_STATUSEMAPHORE_YELLOW 134
+#define IDB_BITMAP2                     135
+#define IDB_BITMAP_STATUSEMAPHORE_GREEN 135
+#define IDB_BITMAP3                     136
+#define IDB_BITMAP_STATUSEMAPHORE_RED   136
 #define IDC_STATIC_RAMP                 1000
 #define IDC_STATIC_VEL                  1001
 #define IDC_STATIC_RAMP_UPPERPOS        1002
@@ -83,6 +89,7 @@
 #define IDC_EDIT_PARAM_ACC_ACT          1066
 #define IDC_COMBO2                      1066
 #define IDC_EDIT_PARAM_ACC_TARGET       1067
+#define IDC_STATIC_STATUS_SEMAPHORE     1067
 #define IDC_EDIT_PARAM_ACC_MAX          1068
 #define IDC_EDIT_PARAM_T_ACT            1069
 #define IDC_EDIT_PARAM_T_TARGET         1070
@@ -119,14 +126,16 @@
 #define IDC_EDIT_PARAM_TM_ACT           1099
 #define IDC_EDIT_DEV_GFACTOR            1100
 #define IDC_COMBO_RAMP_UP_UNITS         1101
+#define IDC_EDIT_STATUS_SEMAPHORE       1102
+#define IDC_BUTTON_DEV_FAULT_RESET      1103
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        131
+#define _APS_NEXT_RESOURCE_VALUE        137
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1067
+#define _APS_NEXT_CONTROL_VALUE         1084
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

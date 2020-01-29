@@ -66,12 +66,16 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\RSSMotorCtrl.rc2">
-      <Filter>Resource Files</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <Image Include="res\RSSMotorCtrl.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\StatusSemaphoreGreen.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\StatusSemaphoreYellow.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\StatusSemaphoreRed.bmp">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

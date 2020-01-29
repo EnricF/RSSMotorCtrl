@@ -114,6 +114,11 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_M_PWM		4
 		#define						DEV_M_STEP		5
 
+
+		//Real parameters - Motor model 400
+		#define						MOTOR_VEL_DR_REV_S	400	//Motor velocity dynamic range
+		#define						MOTOR_ACC_DR_REV_S	666	//Motor acceleration dynamic range
+
 		//Variables
 		double						dDevData[DEV_PARAMS][DEV_FIELDS];				//Device Data PARAMETERS
 		bool						bSetModuleZero;									//Control module zero set
@@ -139,7 +144,14 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						InitDevData();									//Initialize device data structs
 		void						UpdateValue(int id, double v);					//Update Value
 		void						UpdateTargetValue(int id, double v);			//Update Target Value
-
+		
+		/*
+		* Updates Status Semaphore BMP picture
+		* YELLOW at start
+		* RED if STATUS_FAULT bit is read as 1
+		* GREEN otherwise
+		*/
+		void						UpdateStatusSemaphore(short *val);
 
 		double						gearFactor;
 		unsigned int				moduleConfig;
@@ -225,17 +237,16 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int							iLoopDelay;
 		int							iLoopState;
 		
-
 		
-		#define						LOOP_MIN_ERROR				0.0017 //[rad]
+		//#define						LOOP_MIN_ERROR_RAD			0.0017 //[rad]
 		#define						LOOP_MIN_ERROR_ENC			655 //[encoder counts]
 
 		float						fLoopPos;		//[absolute radians]
 		int							iLoopPos;		//[encoder absolute position]
 		float						fLoopTargetPos;	//[absolute radians]
 		int							iLoopTargetPos;	//[encoder absolute position]
-		float						fLoopMaxVel;
-		float						fLoopMaxAcc;
+		float						fLoopMaxVel;	//[rev/s]
+		float						fLoopMaxAcc;	//[rev/s^2]
 		
 		int							iLoopTargetPosLast;
 		bool						bSendLoopCommand;
@@ -289,6 +300,11 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						UpdateVelMotionValues();
 		void						ExecuteVelMotionControl();//VEL mode
 		void						UpdateVelMotionInterface();
+
+		/*
+		*	Gets Profiler limits from User (RAMP group box) and configures drive profiler
+		*/
+		void						UpdateProfilerLimits();
 
 
 
@@ -347,4 +363,10 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg void OnCbnSelchangeComboRampUpUnits();
 		afx_msg void LoadComboBox();
 		enum cmbUnits {	COUNTS, RADIANS	};
+
+		// Picture "Semaphore" to shos STATUS register. YELLOW at start, RED if STATUS_FAULT_BIT == 1, GREEN otherwise
+		CBitmap picStatusSemaphore;
+		afx_msg void OnBnClickedButtonDevFaultReset();
+		afx_msg void OnBnClickedButtonVelSetVelAcc();
+		afx_msg void OnBnClickedCancel();
 };
