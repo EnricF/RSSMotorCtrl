@@ -11,6 +11,40 @@
 #ifndef _bethercat_h_
 #define _bethercat_h_
 
+//OPERATION MODE REGISTER VALUES
+#define POS_M			0x01//To select "Position Mode" in Operation mode CiA register
+#define VEL_M			0x03//To select "Velocity Mode" in Operation mode CiA register
+#define PROFILE_VEL_M	0x13//To select "Profiler Velocity Mode" in Operation mode Axis1 register
+#define PROFILE_POS_M	0x14//To select "Profiler Position Mode" in Operation mode Axis1 register
+
+//CONTROL WORD REGISTER - CHECK AS SOME OF THEM ARE RE-DEFINED AT THE END OF THIS FILE
+#define	CTRLW_SHUTDOWN	0x00
+#define	CTRLW_SWITCHOFF	0x06
+#define	CTRLW_SWITCHON	0x07
+#define	CTRLW_OPERATION	0x0F
+#define	CTRLW_POSMOTION	0x1F
+#define	CTRLW_VELMOTION 0x08//MSByte. It's LSByte is 0x0F (CTRLW_XXXXXX). TWO BYTES in total!
+#define	CTRLW_FAULT_RST	0x80
+
+////////////////////////////////////////////////////
+// ETHERCAT Commands - PENDING REVIEW!!!!
+
+//ControlWordAxis1 & ControlWord(CiA) - LSBYTE
+#define	BETH_CMD_SWITCH_OFF			0x00	//POWER ON and POWER OFF states (standby)
+#define	BETH_CMD_SWITCH_ON			0x06	//Second state after POWER ON (standby)
+#define	BETH_CMD_VOLTAGE_ON			0x07	//Motor has power, ready to receive MOTION parameters
+#define	BETH_CMD_OPERATION_ENABLE	0x0F	//MOTOR has STRENGTH but is NOT IN MOTION yet
+//ControlWordAxis1 only - MSBYTE! (2/2)
+#define	BETH_CMD_LATCH				0x02	//LATCH command (new position, velocity ...)
+#define	BETH_CMD_CLEARLATCHBIT		0x00	//LATCH bit CLEAR command
+//ControlWord (CiA) only - LSBYTE
+#define	BETH_CMD_MOTION_ENABLE		0x1F	//MOTOR is in MOTION- NO PROFILER!											//MOTOR is in MOTION
+
+
+
+
+
+
 /*------------------ Defines --------------------------------------------*/
 
 	//ESD NETS
@@ -20,18 +54,13 @@
 #define BETH_NET3								3
 #define BETH_NET4								4
 
-
-
 ////////////////////////////////////////////////////
 // Can IDENTIFIERS
 #define BETH_ETHID_CMDACK					0xA0
 #define BETH_ETHID_CMDGET 					0xC0
 #define BETH_ETHID_CMDPUT 					0xE0
 
-
-////////////////////////////////////////////////////
-// ETHERCAT Commands
-
+/*
 #define BETH_CMD_RESET							0x00
 #define BETH_CMD_HOME							0x01
 #define BETH_CMD_HALT							0x02
@@ -44,23 +73,23 @@
 #define BETH_CMD_RESTORE_DEFAULTS				0xB1
 #define BETH_CMD_REFRESH_TID                    0xB2
 #define BETH_CMD_CLIENT_REQUEST					0x40
-
+*/
 
 ////////////////////////////////////////////////////
 // ETHERCAT Parameters ID's
 
 //---- SHUNK
 #define BETH_PARAM_DR_HOMEOFFSET				0x00
-#define BETH_PARAM_DR_GEARRATIO                 0x01
+#define BETH_PARAM_DR_GEARRATIO                 0x01	
 #define BETH_PARAM_DR_MINPOS					0x03
 #define BETH_PARAM_DR_MAXPOS					0x04
 #define BETH_PARAM_DR_MAXDELTAPOS				0x05
 #define BETH_PARAM_DR_MAXDELTAVEL				0x06
 #define BETH_PARAM_DR_TORQUERATIO				0x07
-#define BETH_PARAM_DR_MINVEL					0x09
-#define BETH_PARAM_DR_MAXVEL					0x0A
-#define BETH_PARAM_DR_MINACC					0x0B
-#define BETH_PARAM_DR_MAXACC					0x0C
+#define BETH_PARAM_DR_MINVEL					0x09	//Motor Min. Vel.
+#define BETH_PARAM_DR_MAXVEL					0x0A	//Motor Max. Vel.
+#define BETH_PARAM_DR_MINACC					0x0B	//Motor Min. Acc.
+#define BETH_PARAM_DR_MAXACC					0x0C	//Motor Max. Acc. ==> Min/Max Deceleration? Where?
 #define BETH_PARAM_DR_MINCUR					0x0D
 #define BETH_PARAM_DR_MAXCUR					0x0E
 #define BETH_PARAM_DR_HOMEVEL					0x0F
@@ -283,10 +312,17 @@
 // ETHERCAT States ID's
 
 //---- Drive State Machine
-#define	GD_STATE_SWITCH_ON_DISABLE				0x00
-#define	GD_STATE_READY_TO_SWITCH_ON				0x06
-#define	GD_STATE_SWITCH_ON						0x07
-#define	GD_STATE_OPERATION_ENABLE				0x0F
-
+#define	GD_STATE_SWITCH_ON_DISABLE				0x00	//POWER ON and POWER OFF states (standby)
+#define	GD_STATE_READY_TO_SWITCH_ON				0x06	//Second state after POWER ON (standby)
+#define	GD_STATE_SWITCH_ON						0x07	//Motor has power, ready to receive MOTION parameters
+#define	GD_STATE_OPERATION_ENABLE				0x0F	//MOTOR has STRENGTH but is NOT IN MOTION yet
+#define	GD_STATE_MOTION_ENABLE					0x31	//MOTOR is in MOTION											//MOTOR is in MOTION
+/*
+enum driveSTATE {
+	SHUTDOWN = 0,	//POWER ON and POWER OFF states (standby)
+	SWITCHON,		//second state after POWER ON (standby)
+	OPERATION,		//Motor has power, ready to receive MOTION parameters
+	MOTION			//MOTOR is in MOTION
+};*/
 
 #endif /* _bcan_h_ */

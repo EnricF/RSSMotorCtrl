@@ -5,8 +5,8 @@
 /*      Copyright 2008 - 2015 esd electronic system design gmbh         */
 /*----------------------------------------------------------------------*/
 /*                                                                      */
-/*      Filename:      ecmTest.c                                        */
-/*      Language:      ANSI C                                           */
+/*      Filename:      ecm.c											*/
+/*      Language:      ANSI C++/C                                       */
 /*      Targetsystem:  QNX, VxWorks, RTX / RTX64, Win XP/Vista/7/8+     */
 /*                     OS-9, Linux, WinCE                               */
 /*----------------------------------------------------------------------*/
@@ -172,11 +172,10 @@
 # define opterr         _opterr
 # define optopt         _optopt
 #endif
-#include <getopt.h>
-#include <ecm.h>
 
 //EF mod
 #include "globalVar.h"
+#include "ecmW.h"
 //------
 
 
@@ -215,7 +214,7 @@
 #  define PRIO_ACYCLIC      70
 #  define PRIO_CYCLIC       60
 #  define PRIO_REMOTE       80
-#  define main              _ecmTest  /* Redefine main for VxWorks */
+#  define main              _ecmW  /* Redefine main for VxWorks */
 # elif defined(__QNXNTO__)
 #  define PRIO_ACYCLIC      50
 #  define PRIO_CYCLIC       100
@@ -507,17 +506,17 @@ static uint8_t *pucDio_ProfilerMaxDec	= NULL;//"Profiler max. deceleration" poin
 //Axis1
 static uint8_t *pucDio_OperationModeAxis1	= NULL;//"Operation mode" pointer	0x2014 (Axis1)
 static uint8_t *pucDio_ControlWordAxis1		= NULL;//"Control Word" pointer		0x2010 (Axis1)
-static uint8_t *pucDio_PositionSetPoint		= NULL;//"Target position" pointer	0x2020 (Axis1)
-static uint8_t *pucDio_VelocitySetPoint		= NULL;//"Target velocity" pointer	0x2021 (Axis1)
+static uint8_t *pucDio_PositionSetPoint		= NULL;//"Target position" pointer	0x2020 (Axis1) - Motor(inner)
+static uint8_t *pucDio_VelocitySetPoint		= NULL;//"Target velocity" pointer	0x2021 (Axis1) - Motor(inner)
 
 //Readings from slave
 static uint8_t *pucDio_StatusWord		= NULL;//"Status mode" pointer						(CiA)
-static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer					(CiA)
-static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer					(CiA)
+static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer					(CiA) - Motor(inner)
+static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer					(CiA) - Motor(inner)
 static uint8_t *pucDio_DisplayOperationMode = NULL;//"Operation mode display" pointer		(CiA)
 static uint8_t *pucDio_PrimaryTemperature	= NULL;//"Primary temperature value" pointer	(Axis1)
 static uint8_t *pucDio_MotorTemperature		= NULL;//"Motor temperature value" pointer		(Axis1)
-static uint8_t *pucDio_RotorPositionActual	= NULL;//"BISS-C slave 1 / Primary SSI-Position" pointer (Axis1)
+static uint8_t *pucDio_ModulePositionActual	= NULL;//"BISS-C slave 1 / Primary SSI-Position" pointer (Axis1) - Module(outter)
 static uint8_t *pucDio_LastError			= NULL;//"Last error" pointer					(Axis1)
 static uint8_t *pucDio_StatusWord2			= NULL;//"Status mode" pointer					(Axis1)
 
@@ -538,20 +537,20 @@ int			iCommandProfileVel		= 0;//iterator of actual command in Profile Velocity m
 //Little-Endian buffer
 uint8_t LEbuffer[4] = { 0,0,0,0 };//To keep LittleEndian bytes, temporal
 //address (PDO) | value
-struct commandsMatrix {
+typedef struct commandsMatrix {
 	uint8_t *PDOpointer;
 	uint8_t value;
-};
+}commandsMatrix;
+
+////Temporally global, to be moved inside its class
+FILE		*ECMlogFile;
+const char	*cECMlogFile = "logFile.txt";
 
 /*********************************************************************/
 /*                   FORWARD DECLARATIONS                            */
 /*********************************************************************/
 static int ecmTestInit(ECM_LIB_INIT *pLibInit);
 static int ecmTestCleanup(void);
-
-//Temporally global, to be moved inside its class
-FILE		*ECMlogFile;
-const char	*cECMlogFile = "logFile.txt";
 
 
 /*
@@ -1283,7 +1282,7 @@ static int PrintEsiInformation(char *buffer, uint32_t ulSzBuffer)
  * Sample code to use the async I/O interface of the master stack
  * to read ESC register and the EEPROM
  */
-static int PrintEscRegister(ECM_HANDLE hndMaster)
+int PrintEscRegister(ECM_HANDLE hndMaster)
 {
     int result, port;
     int32_t iAddr = 0;
@@ -2691,13 +2690,21 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
 	if (ECM_SUCCESS == result) {
 		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
-			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_RotorPositionActual);
+			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_ModulePositionActual);
 		if (result != ECM_SUCCESS) {
 			fprintf(ECMlogFile, "Failed to get reference to variable Motor temperature\n");
 		}
 	}
 
-	
+	result = ecmLookupVariable(hndMaster, "Last error", &VarDesc,
+		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_LastError);
+		if (result != ECM_SUCCESS) {
+			fprintf(ECMlogFile, "Failed to get reference to variable Last Error\n");
+		}
+	}	
 
     /*
      * Get reference to process variables
@@ -3163,7 +3170,7 @@ static void ecmTestDcMonitoring(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster)
     return;
 }
 
-CecmTest::CecmTest() {
+CecmW::CecmW() {
 
 	//Open log file with writting permissions
 	ECMlogFile = fopen(cECMlogFile, "w");
@@ -3174,17 +3181,17 @@ CecmTest::CecmTest() {
 		fflush(ECMlogFile);
 	}
 
-	driveState = SHUTDOWN;//Power on default state
+	//driveState = GD_STATE_SWITCH_ON_DISABLE;//Power on default state
 }
 
-CecmTest::~CecmTest() {
+CecmW::~CecmW() {
 	//TODO
 	fclose(ECMlogFile);
 
-	driveState = SHUTDOWN;//Power off default state
+	//driveState = GD_STATE_SWITCH_ON_DISABLE;//Power off default state
 }
 
-int CecmTest::Init(int argc, char *argv[], bool *is_running)
+int CecmW::Init(int argc, char *argv[], bool *is_running)
 {
 	ECM_VERSION  ecmVersion;
 	ECM_LIB_INIT libInitData;
@@ -3783,725 +3790,6 @@ int CecmTest::Init(int argc, char *argv[], bool *is_running)
 	return 0;
 }
 
-DWORD WINAPI CecmTest::emcThreadFunction(LPVOID lpParam) {
-	
-	PMYDATA arg = (PMYDATA)lpParam;
-
-
-	//old functional call for base version
-//	main(arg->argc, arg->argv);
-
-	//mod for compilation success while code is being modified but not finished yet
-	CecmTest test;
-	test.main(arg->argc, arg->argv);
-
-	return 0;
-}
-
-
-int CecmTest::main(int argc, char *argv[])
-{
-    ECM_VERSION  ecmVersion;
-    ECM_LIB_INIT libInitData;
-    ECM_HANDLE   hndDevice, hndMaster, hndSlave;
-    ECM_ETHERNET_ADDRESS macPrimary, macRedundant;
-    ECM_CFG_INIT cfgInitData;
-    const char   *pszArchiveFile, *pszEniFile = NULL;
-    int i, j, result;
-    uint32_t numAdapter;
-    PECM_NIC pNicList;
-    ECM_PROC_CTRL ProcCtrl;
-    ECM_MASTER_STATE masterState;
-
-    /* Print the startup banner */
-	printf("EtherCAT master test application V%d.%d.%d\n",
-       ECM_TEST_MAJOR, ECM_TEST_MINOR, ECM_TEST_BUILD);
-    printf("(c) 2008-2015 esd electronic system design gmbh\n\n");
-
-    /* Parse the command line arguments and adjust args to last argument */
-    ParseCommandLine(argc, argv);
-
-    argc -= optind;
-    argv += optind;
-
-    /* OS dependent initialization of the runtime environment */
-    result = ecmTestInit(&libInitData);
-    if (result != 0) {
-      printf("ecmTestInit() returned with %d\n", result);
-      return(-1);
-    }
-
-    /* Initialization of master library */
-    libInitData.ulEventMask     = g_ulEventMask;
-    libInitData.ulEventMask    |= ECM_EVENT_REMOTE;
-    libInitData.pfnEventHandler = ecmEventHandler;
-    libInitData.ulDbgMask       = g_ulDebugMask;
-    result = ecmInitLibrary(&libInitData);
-    if (result != ECM_SUCCESS) {
-        printf("Initializing master stack failed with %s\n",
-            ecmResultToString(result));
-        (void)ecmTestCleanup();
-        return(-1);
-    }
-
-    /* Make of copy of the high resolution counter frequency */
-    g_ulCyclesPerSec = (uint32_t)libInitData.ullCyclesPerSec;
-
-    /* Print revision of master modules and validate ABI */
-    ecmVersion.usVersionMaster = (ECM_LEVEL << 12) | (ECM_REVI << 8) | ECM_BUILD;
-    if (ecmGetVersion(&ecmVersion) != ECM_SUCCESS) {
-        printf("Getting EtherCAT master version information failed\n");
-        (void)ecmTestCleanup();
-        return(-1);
-    }
-    if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_VERSION) != 0) {
-        PrintVersionInformation(&ecmVersion);
-    }
-
-    /* Get number of available NICs */
-    if (ecmGetNicList(NULL, &numAdapter) != ECM_SUCCESS) {
-        printf("Getting number of available adapter failed\n");
-        (void)ecmTestCleanup();
-        return(-1);
-    } else {
-        pNicList = (PECM_NIC)calloc(numAdapter, sizeof(ECM_NIC));
-        if (pNicList != NULL) {
-            ecmGetNicList(pNicList, &numAdapter);
-            if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
-                printf("\nAvailable NICs for EtherCAT\n");
-                printf("---------------------------\n");
-            }
-            for (i = 0; i < (int)numAdapter; i++) {
-                if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
-                    printf("%d. %s\n   MAC: %02x.%02x.%02x.%02x.%02x.%02x\n",
-                        i, pNicList[i].szName,
-                        pNicList[i].macAddr.b[0], pNicList[i].macAddr.b[1],
-                        pNicList[i].macAddr.b[2], pNicList[i].macAddr.b[3],
-                        pNicList[i].macAddr.b[4], pNicList[i].macAddr.b[5]);
-                }
-                if (iPrimaryNic == i) {
-                    ECM_INIT_MAC(macPrimary, pNicList[i].macAddr);
-                }
-                if (iRedundantNic == i) {
-                    ECM_INIT_MAC(macRedundant, pNicList[i].macAddr);
-                }
-            }
-            free(pNicList);
-        }
-    }
-
-    /* Start remote server */
-    if ((ulConfigFlags & ECM_TEST_FLAG_REMOTE_SERVER) != 0) {
-        uint32_t ulFlags;
-
-        printf("Start remote server (%s) in ", g_szChannelDescription);
-        if((ulConfigFlags & ECM_TEST_FLAG_REMOTE_MONITOR) != 0) {
-            ulFlags = ECM_FLAG_REMOTE_MONITOR_MODE;
-            printf("monitoring mode ...\n");
-        } else {
-            ulFlags = ECM_FLAG_REMOTE_CONTROL_MODE;
-            printf("control mode ...\n");
-        }
-        ECM_SET_REMOTE_SERVER_PRIO(ulFlags, PRIO_REMOTE);
-        ECM_SETUP_REMOTE_WATCHDOG(ulFlags, 5);
-        result = ecmStartRemotingServer(g_szChannelDescription, ulFlags);
-        if (result != ECM_SUCCESS) {
-            printf(" - Failed with %s\n", ecmResultToString(result));
-            (void)ecmTestCleanup();
-            return(-1);
-        }
-    }
-
-    /* Clear the init data structure */
-    ECM_INIT(cfgInitData);
-    
-    /* Check if ENI file is defined */
-    if (argc != 1) {
-        PrintUsage();
-        (void)ecmTestCleanup();
-        return(0);
-    } else {
-        /* Get ENI configuration file and (optional) archive file */
-        pszEniFile     = strtok(argv[0], "@");
-        pszArchiveFile = strtok(NULL,"@");
-        /* Return without configuration file */
-        if (NULL == pszEniFile) {
-            printf("No EtherCAT network configuration specified\n");
-            (void)ecmTestCleanup();
-            return(-1);
-        }
-
-        /* Get configuration data either from file or from memory */
-        if (0 == (ulConfigFlags & ECM_TEST_FLAG_MEMORY_CONFIG)) {
-            cfgInitData.Config.File.pszEniFile     = pszEniFile;
-            cfgInitData.Config.File.pszArchiveFile = pszArchiveFile;
-            if (strlen(g_szPassword) > 0) {
-                cfgInitData.Config.File.pszPassword    = g_szPassword;
-            }
-        } else {
-            result = ReadConfigFileIntoMemory(pszArchiveFile ? pszArchiveFile : pszEniFile,
-                (void **)&cfgInitData.Config.Buffer.pAddress,
-                &cfgInitData.Config.Buffer.size);
-            if (result != 0) {
-                free((void *)cfgInitData.Config.Buffer.pAddress);
-                (void)ecmTestCleanup();
-                return(-1);
-            }
-            cfgInitData.ulFlags                    = ECM_FLAG_CFG_PARSE_BUFFER;
-            cfgInitData.Config.Buffer.pszEniFile   = pszEniFile;
-            if (strlen(g_szPassword) > 0) {
-                cfgInitData.Config.Buffer.pszPassword    = g_szPassword;
-            }
-        }
-
-        /* Indicate compressed configuration */
-        if (pszArchiveFile != NULL) {
-            cfgInitData.ulFlags |= ECM_FLAG_CFG_COMPRESSED;
-        }
-    } /* of if (argc != 1) */
-
-
-    /* Store parser status in MSB of payload from ECM_EVENT_CFG_SYNTAX */
-    cfgInitData.ulFlags |= ECM_FLAG_CFG_ENI_ERR_REASON;
-
-    /* Copy the VLAN TCI */
-    cfgInitData.cfgDataMaster.vlanTCI = g_usVlanTci;
-
-    /* Define virtual port descriptor for EoE */
-    /* cfgInitData.cfgDataDevice.ucVport = 2; */
-
-    /* Mark master instance as monitored instance in remote monitoring mode */
-    if((ulConfigFlags & ECM_TEST_FLAG_REMOTE_MONITOR) != 0) {
-        cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_REMOTE_INSTANCE;
-    }
-
-    /* Overwrite MAC of configuration file with own adapter MAC */
-    cfgInitData.ulFlags |= ECM_FLAG_CFG_IGNORE_SRC_MAC;
-    ECM_INIT_MAC(cfgInitData.cfgDataDevice.macAddr[ECM_NIC_PRIMARY], macPrimary);
-    if ((ulConfigFlags & ECM_TEST_FLAG_REDUNDANCY) != 0) {
-        cfgInitData.cfgDataDevice.ulFlags |= ECM_FLAG_DEVICE_REDUNDANCY;
-        ECM_INIT_MAC(cfgInitData.cfgDataDevice.macAddr[ECM_NIC_REDUNDANT],
-            macRedundant);
-    }
-    /* Use EtherCAT via UDP */
-    if ((ulConfigFlags & ECM_TEST_FLAG_UDP) != 0) {
-        cfgInitData.cfgDataDevice.ulFlags |= ECM_FLAG_DEVICE_UDP;
-    }
-
-    /* Do not include I/O time profiling ECM_PROFILE_CYCLIC_WORKER */
-    if(g_ulProfileMask & ECM_TEST_PROF_MODE_NO_IO_TIME) {
-        cfgInitData.cfgDataDevice.ulFlags |= ECM_FLAG_DEVICE_PROFILE_NO_IO;
-    }
-
-    /* Use destination MAC of ENI file instead of broadcast */
-    if ((ulConfigFlags & ECM_TEST_FLAG_NO_BROADCAST) != 0) {
-        cfgInitData.ulFlags |= ECM_FLAG_CFG_USE_DST_MAC;
-    }
-
-    /* Enable optimized cyclic frames */
-    if ((ulConfigFlags & ECM_TEST_FLAG_REDUCE_CYCLIC_FRM) != 0) {
-        cfgInitData.ulFlags |= ECM_FLAG_CFG_REDUCE_FRAMES;
-    }
-
-    /* Setup number of cycles after NIC link state is checked */
-    cfgInitData.cfgDataDevice.usCycleLinkState = 50;
-
-    /* Setup number of cycles after watchdog is triggered */
-    cfgInitData.cfgDataDevice.usCycleWatchdog  = 0;    /* 50; */
-
-    /* Limit # of acyclic frames per I/O cycle */
-    cfgInitData.cfgDataDevice.usAcycCtrl       = g_usAcycCtrl;
-
-    /* Use configured destination MAC instead of broadcast */
-    if ((ulConfigFlags & ECM_TEST_FLAG_FORCE_DST_ADDR) != 0) {
-        ECM_INIT_MAC(cfgInitData.cfgDataMaster.macAddr, g_DstMac);
-        cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DST_ADDR_VALID;
-    }
-
-    /* Use the stack for process data */
-    cfgInitData.cfgDataMaster.pInput     = &ucInputBuffer;
-    cfgInitData.cfgDataMaster.ulSzInput  = sizeof(ucInputBuffer);
-    cfgInitData.cfgDataMaster.pOutput    = &ucOutputBuffer;
-    cfgInitData.cfgDataMaster.ulSzOutput = sizeof(ucOutputBuffer);
-
-    /* Setup DC configuration if enabled */
-    if ((ulConfigFlags & ECM_TEST_FLAG_USE_DC) != 0) {
-        cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DC;
-        if ((ulConfigFlags & ECM_TEST_FLAG_DC_DRIFT_COMP) != 0) {
-            cfgInitData.cfgDataMaster.ulFlags |= ECM_FLAG_MASTER_DC_RESYNC;
-        }
-        cfgInitData.cfgDataMaster.ucDcSysTimeEpoch = g_ucDcSysTimeEpoch;
-        /*
-         * Enable master clock synchronization if configured and set the
-         * configured parameter for control loop and local DC shift.
-         */
-        if ((ulConfigFlags & ECM_TEST_FLAG_DCM_CLOCK_SHIFT) != 0) {
-            cfgInitData.cfgDataMaster.ulFlags      |= ECM_FLAG_MASTER_DCM_CLOCK_SHIFT;
-            cfgInitData.cfgDataMaster.sDcUserShift  = g_sUserShiftMaster;
-            cfgInitData.cfgDataDevice.usCycleDcCtrl = g_usDcClockControl;
-        }
-    }
-
-
-    /* Enable slave monitoring support */
-    if ((ulConfigFlags & ECM_TEST_FLAG_SLAVE_STATUS) != 0) {
-        cfgInitData.ulFlags                |= (ECM_FLAG_CFG_DIAG_STATUS |
-                                               ECM_FLAG_CFG_DIAG_ERRCNT);
-        cfgInitData.cfgDataMaster.ulFlags  |= ECM_FLAG_MASTER_DIAG;
-    }
-
-    /* Set alignment to 4 */
-    cfgInitData.cfgDataMaster.ucAlignment = 4;
-
-    /* Say: Support virtual variables and keep process variable description */
-    cfgInitData.ulFlags |= ECM_FLAG_CFG_VIRTUAL_VARS  |
-                           ECM_FLAG_CFG_KEEP_PROCVARS;
-
-    /* Say: Want to create device and master */
-    hndDevice = ECM_INVALID_HANDLE;
-
-	//EF modifications
-	FILE * pFile;
-	pFile = fopen(argv[0], "r");
-	//pFile = fopen("C:\\workspace\\Base_project_Master_Config_sample.xml", "r");
-	if (pFile != NULL)
-	{
-		fprintf(ECMlogFile, "ENI configuration file selected: %s\n", argv[0]);
-		fclose(pFile);
-	}
-	//-----------------
-
-    /* Create configuration based on ENI configuration file */
-    result = ecmReadConfiguration(&cfgInitData, &hndDevice, &hndMaster);
-    /* Free resources if configuration is stored in memory */
-    if ((ulConfigFlags & ECM_TEST_FLAG_MEMORY_CONFIG) != 0) {
-        free((void *)cfgInitData.Config.Buffer.pAddress);
-    }
-    if (result != ECM_SUCCESS) {
-        printf("Reading configuration failed with %s\n", ecmResultToString(result));
-        (void)ecmTestCleanup();
-        return(result);
-    }
-
-    /*
-     * Cycle time precedence:
-     *      1. Command line parameter
-     *      2. esd EtherCAT Workbench specific keyword <CycleTime>
-     *      3. Default cycle time
-     */
-    if(0 == g_ulCycleTime) {
-        if(0 == cfgInitData.cfgDataDevice.ulCycleTime) {
-            g_ulCycleTime = ECM_TEST_DEFAULT_CYCLE_TIME;
-        } else {
-            g_ulCycleTime = cfgInitData.cfgDataDevice.ulCycleTime;
-        }
-    }
-
-    /*
-     * In case of cyclic handler jitter check without allowed absolute value
-     * use 10 percent of configured cycle time as threshold for an indication.
-     */
-    if ((ulConfigFlags & ECM_TEST_FLAG_CHECK_JITTER) != 0) {
-        if(0 == g_ulCycleTimeViolation) {
-            g_ulCycleTimeViolation = g_ulCycleTime / 10;
-        }
-        g_ulCycleTimeViolation += g_ulCycleTime;
-    }
-
-    /* Print device description */
-    printf("Device:\n-------\n");
-    PrintDeviceDescription(hndDevice);
-
-    /* Print master description */
-    printf("Master:\n-------\n");
-    PrintMasterDescription(hndMaster);
-
-    /* Iterate list of slaves */
-    printf("Slaves:\n-------\n");
-    for (hndSlave = hndMaster; hndSlave;) {
-        if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
-            break;
-        }
-
-        /* Print slave description */
-        PrintSlaveDescription(hndSlave);
-    }
-
-    /* Print the list of process variables (defined in ENI file) */
-    PrintVarList(hndMaster);
-
-    /* Print copy vector */
-    PrintCopyVector(hndMaster);//EF mod
-
-    /* Print statistic information */
-    PrintStatistic(hndDevice, hndMaster);
-
-    /* Setup reference to variables before attaching the master */
-    ecmTestSetupProcesData(hndMaster);
-
-    /* Attach the master to the device */
-    result = ecmAttachMaster(hndMaster);
-    if (result != ECM_SUCCESS) {
-        printf("Attaching master failed with %s\n", ecmResultToString(result));
-        ecmDeleteMaster(hndMaster);
-        ecmDeleteDevice(hndDevice);
-        (void)ecmTestCleanup();
-        return(-1);
-    }
-
-    ecmSleep(1000);
-
-    /* Reset error handling in cyclic handler */
-    CycleHandlerErrorMessage(ECM_SUCCESS, ECM_TEST_CYCLIC_HANDLER);
-    CycleHandlerErrorMessage(ECM_SUCCESS, ECM_TEST_CYCLIC_START_HANDLER);
-    CycleHandlerErrorMessage(ECM_SUCCESS, ECM_TEST_CYCLIC_END_HANDLER);
-
-    /* Setup background worker tasks parameter */
-    ECM_INIT(ProcCtrl);
-    if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_ACYC_WORKER)) {
-        ProcCtrl.ulAcyclicPeriod = 1000;
-        ProcCtrl.ulAcyclicPrio   = PRIO_ACYCLIC;
-    }
-    if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER)) {
-        ProcCtrl.ulCyclicPeriod = g_ulCycleTime;
-        ProcCtrl.ulCyclicPrio   = PRIO_CYCLIC;
-        ProcCtrl.pfnHandler     = CycleHandler;
-        ProcCtrl.pfnBeginCycle  = CycleStartHandler;
-        ProcCtrl.pfnEndCycle    = CycleEndHandler;
-        /* Configure I/O processing order */
-        if ((g_ulIoMode & ECM_TEST_IO_MODE_TX_BEFORE_RX) != 0) {
-            ProcCtrl.ulFlags = ECM_FLAG_CTRL_OUT_BEFORE_IN;
-        }
-    }
-
-    result = ecmProcessControl(hndDevice, &ProcCtrl);
-    if (result != ECM_SUCCESS) {
-        printf("Creating background worker threads failed with %s\n",
-            ecmResultToString(result));
-        ecmDetachMaster(hndMaster);
-        ecmDeleteMaster(hndMaster);
-        ecmDeleteDevice(hndDevice);
-        (void)ecmTestCleanup();
-        return(-1);
-    } else {
-        printf("Worker thread cycle times (microseconds) (Cyclic: %d / Acyclic %d)\n",
-            ProcCtrl.ulCyclicPeriod, ProcCtrl.ulAcyclicPeriod);
-    }
-
-	//EF mod ----------------------------------------
-	uint16_t value = 0;//This is the value
-	void* pData = &value;//Pointer to the value
-	/*uint16_t pucCnt_val = 0;
-	uint16_t* pucCnt = &pucCnt_val;
-	
-	ECM_SLAVE_ADDR addr_slv[NUMCOMMANDS];
-	//addr_slv[0].p.ado = 0x010;//Just next node, single  slave(which register it is?)
-	//addr_slv[0].p.adp = 0x0000;//Just next node, single  slave (first salve, the only one available by now)
-	for (i = 0; i < NUMCOMMANDS; i++) {
-		addr_slv[i].p.adp = 0x0000;//it could be addr_slv[i].p.adp = 0x03E9, but is not working yet. Just keep 0x0000 by now
-	}
-	//NOTE: addresses are related to Slave::Memory (as seen in ESD Workbench)
-	//Other functions must be used for CoE communication (just like VS does)
-	//So, an offset value of 0x2000 may be a fast solution to aim to an specific registers, related to AXIS1 of SLAVE1 (there are no more axes neither slaves)
-
-	//uint16_t usSize_data[NUMCOMMANDS];
-	   
-	//ADO value has an offset of 0x2000 (axis-1) as Ingenia documentation specifies.
-	//By default, addres_slv[any].p.ado = 0x0000
-	//Set previously in a for loop
-	
-	//1.BRD
-	addr_slv[0].p.ado = 0x2010;//0x010 (Control Word - RW)
-	usSize_data[0] = sizeof(uint16_t);//4bytes == 32bits
-	//2.BRD
-	addr_slv[1].p.ado = 0x2011;//0x011 (Status Word - RO)
-	usSize_data[1] = sizeof(uint16_t);
-	//3.BWR
-	addr_slv[2].p.ado = 0x2014;//0x014 (Operation mode - RW)
-	usSize_data[2] = sizeof(int8_t);
-	//4.FPRD
-	addr_slv[3].p.adp = 0x03E9;//Slave address
-	addr_slv[3].p.ado = 0x2014;//0x015 (Operation mode display - RO) NOT WORKING YET! So it is changed to 0x2014
-	usSize_data[3] = sizeof(int8_t);
-	//5.BRD
-	addr_slv[4].p.ado = 0x2014;//0x015 (Operation mode display - RO) NOT WORKING YET! So it is changed to 0x2014
-	usSize_data[4] = sizeof(int8_t);
-	//6.FPWR
-	addr_slv[5].p.adp = 0x03E9;//Slave address
-	addr_slv[5].p.ado = 0x2010;//0x010 (Control Word - RW)
-	usSize_data[5] = sizeof(int16_t);
-	//7.BRD
-	addr_slv[6].p.ado = 0x2010;//0x010 (Control Word - RW)
-	usSize_data[6] = sizeof(int8_t);
-	//8.BRD
-	addr_slv[7].p.ado = 0x2030;//0x030 (Actual Position - RO)
-	usSize_data[7] = sizeof(int32_t);*/
-	//------------------------------------
-
-    /* INIT -> OP loop */
-    do {
-        /* Wait some cycles */
-        ecmSleep(100);//EF mod, default value is 100 ms
-
-        /* Do some I/O using async services in INIT state */
-        PrintEscRegister(hndMaster);
-
-        /*
-        * Change EtherCAT network state to into OPERATIONAL.
-        */
-        result = ChangeEcatState(hndDevice, hndMaster, ECM_DEVICE_STATE_OP);
-        if (result != ECM_SUCCESS) {
-            printf("Network failed to change into OPERATIONAL with %s!\n",
-                ecmResultToString(result));
-            ecmDetachMaster(hndMaster);
-            ecmDeleteMaster(hndMaster);
-            ecmDeleteDevice(hndDevice);
-            (void)ecmTestCleanup();
-            return(-1);
-        }
-
-        /*
-        * Validate if all configured slaves are present and OPERATIONAL
-        */
-        result = ecmGetMasterState(hndMaster, NULL, &masterState);
-        if (result != ECM_SUCCESS) {
-            printf("Requesting master state failed with %s\n", ecmResultToString(result));
-        } else {
-            if (masterState.usNumSlaves != masterState.usActiveSlaves) {
-                printf("Warning: Number of configured slaves (%d) "
-                    "differ from active slaves (%d)\n",
-                    masterState.usNumSlaves, masterState.usActiveSlaves);
-            }
-            if ((masterState.ulFlags & ECM_LOCAL_STATE_MASK) != 0) {
-                printf("Warning: Not all slaves changed into operational !!\n");
-            }
-        }
-
-        /* Scan and CoE object dictionary |SoE data elements */
-        if ((ulConfigFlags & ECM_TEST_FLAG_SCAN_DICTIONARY) != 0) {
-            /* Blocking operation not possible without cyclic worker task */
-            if ((g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER) != 0) {
-                printf("Blocking ESC access not supported without cyclic worker !\n");
-            } else {
-                for (hndSlave = hndMaster; hndSlave;) {
-                    ECM_SLAVE_DESC descSlave;
-
-                    if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
-                        break;
-                    }
-                    /* Gets slave state and do an object scan for CoE/SoE slaves */
-                    result = ecmGetSlaveState(hndSlave, &descSlave, NULL);
-                    if (result != ECM_SUCCESS) {
-                        printf("Requesting slave description failed with %s\n",
-                            ecmResultToString(result));
-                        continue;
-                    }
-                    if ((descSlave.ulFlags & ECM_FLAG_SLAVE_COE) != 0) {
-                        ecmTestCoeScan(hndSlave);
-                        printf("\t\t-----------\n");
-                        ecmSleep(1000);
-                    } else if ((descSlave.ulFlags & ECM_FLAG_SLAVE_SOE) != 0) {
-                        ecmTestSoeScan(hndSlave);
-                        ecmSleep(1000);
-                    }
-                }
-            }
-        }
-
-        /* Initialize to request slave diagnostic data */
-        hndSlave = hndMaster;
-
-        /*
-        * Print device state and active slaves while running.
-        * Cyclic I/O data is handled in the callback handler
-        */
-        for (i = 0; ; i++) {
-            uint16_t usData;
-
-            /* Check exit condition */
-            if ((g_lRuntime != 0) && i >= (int)g_lRuntime) {
-                break;
-            }
-
-            /* Print device state (virtual variable) */
-            if (pDevState != NULL) {
-                ecmCpuToLe(&usData, pDevState, (const uint8_t *)"\x2\x0");
-                printf("State: %04x", usData);
-            }
-            /* Print # of slaves on primary and redundant adapter */
-            if (pSlaveCount != NULL) {
-                ecmCpuToLe(&usData, pSlaveCount, (const uint8_t *)"\x2\x0");
-                printf(" / Pri: %d", usData);
-                if (pSlaveCount2 != NULL) {
-                    ecmCpuToLe(&usData, pSlaveCount2, (const uint8_t *)"\x2\x0");
-                    printf(" / Red: %d", usData);
-                }
-            }
-
-            /* Print WC state of 1st frame */
-            if (pWcState != NULL) {
-                ecmCpuToLe(&usData, pWcState, (const uint8_t *)"\x2\x0");
-                printf(" / Frm0WC: %04x", usData);
-            }
-
-            /* Request diagnostic data in round robin mode */
-            if ((ulConfigFlags & ECM_TEST_FLAG_SLAVE_STATUS) != 0) {
-                if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
-                    hndSlave = hndMaster;
-                } else {
-                    ECM_SLAVE_DIAG diag;
-                    diag.usControl = 0;
-                    if(ECM_SUCCESS == ecmGetSlaveDiag(hndSlave, &diag)) {
-                        printf(" Link lost (Slave %x): %d", diag.usAddr,
-                            diag.counter.ucLostLinkErrorPort0);
-                    }
-                }
-            }
-
-            printf("\n");
-
-            /* Optionally print DC statistic */
-            if ((ulConfigFlags & ECM_TEST_FLAG_USE_DC) != 0) {
-                ecmTestDcMonitoring(hndDevice, hndMaster);
-            }
-
-			//EF mod
-			/*
-			* This is just a sample code
-			* Each step is done only once
-			* Each step is done fast and simple, to not take so much time on this
-			* Its main purpose is to:
-			*	1) Set operation mode to 1 == Profile Position
-			*	2) Set Control Word to 6,7 and 15. Check values (W-->R)
-			*	3) Set a new position
-			*	4) Set motor in motion to reach the new position. Control Word == 31
-            */
-
-			//Sends and async request to a slave
-			//ecmAsyncRequest(ECM_HANDLE hndMaster, uint8_t ucCmd, ECM_SLAVE_ADDR addr, uint16_t usSize,void *pData, uint16_t *pucCnt);
-
-			//Note that variables declaration and initialization is done before "OP" mode begins
-			/*int i = ecmAsyncRequest_cnt;
-			if(i > NUMCOMMANDS-1)
-				i = NUMCOMMANDS-1;
-
-			switch (ecmAsyncRequest_cnt) {
-
-				case 0:
-					break;
-				case 1:
-					break;
-				case 2:
-					value = 1;//Operation mode: Profile position
-					break;
-				case 3:
-					value = 0;//dummy value, is RD operation so it will be overwritten. Just to avoid "misunderstandings"
-					break;
-				case 4:
-					break;
-				case 5:
-					value = 1;//Testing a Logical read/write operation
-					//value = 6; //Shutdown --> Control Word 0x010
-					break;
-				case 6:
-					//Testing a Logical read operation
-					//value = 7; //Switch on --> Control Word 0x010
-					break;
-				case 7:
-					value = 6; //Shutdown --> Control Word 0x010
-					//value = 15; //Switch on + operation enabled --> Control Word 0x010
-					break;
-				case 8:
-					break;
-				case 9:
-					break;
-				default:
-					break;
-			}
-
-			if (ECM_SUCCESS == ecmAsyncRequest(hndMaster, newCommands[i].cmdType, newCommands[i].address, newCommands[i].numBytes, pData, pucCnt))
-			{
-				//fprintf(ECMlogFile, "OK! Value BRD = 0x%04X\n", value);
-			}
-			else 
-			{
-				fprintf(ECMlogFile, "Error\n");
-			}
-
-			ecmAsyncRequest_cnt++;//increase value for next iteration
-			*/
-			/*pucCnt++;//increase pointer to WC counter
-
-			if (pucCnt > &pucCnt_val[NUMCOMMANDS-1]) {
-				pucCnt = &pucCnt_val[NUMCOMMANDS-1];//DON'T OVERFLOW!
-			}*/
-			//---------------------------------------
-
-            /* If the background worker task is running we just wait and
-            * get called in our handler with each cycle. Without worker
-            * task we have to drive our own I/O cycle and call the handler
-            * in between.
-            */
-            if (0 == (g_ulIoMode & ECM_TEST_IO_MODE_NO_CYC_WORKER)) {
-                ecmSleep(100);//EF mod, default is 1000 ms
-            } else {
-                for (j = 0; j < 100; j++) {
-                    DoEcatIo(hndDevice);
-                    ecmSleep(10);
-                }
-            }
-
-            /* Print collected profiling data if configured */
-            if ((ulConfigFlags & ECM_TEST_FLAG_PROFILING) != 0) {
-                PrintProfilingData(hndDevice);
-            }
-        }
-
-        fprintf(ECMlogFile,"Change state to INIT...\n");
-
-        /* Change EtherCAT state back to INIT */
-        result = ChangeEcatState(hndDevice, hndMaster, ECM_DEVICE_STATE_INIT);
-        if (result != ECM_SUCCESS) {
-            printf("Network failed to change into INIT ! (%s)\n",
-                ecmResultToString(result));
-            (void)ecmTestCleanup();
-            return(-1);
-        }
-
-        PrintStatistic(hndDevice, hndMaster);
-
-    } while(--g_lLoops > 0);
-
-    printf("Detaching master...\n");
-    result = ecmDetachMaster(hndMaster);
-    if (result != ECM_SUCCESS) {
-        printf("Failed with %s\n", ecmResultToString(result));
-    }
-
-    printf("Deleting master...\n");
-    result = ecmDeleteMaster(hndMaster);
-    if (result != ECM_SUCCESS) {
-        printf("Failed with %s\n", ecmResultToString(result));
-    }
-
-    printf("Deleting device...\n");
-    result = ecmDeleteDevice(hndDevice);
-    if (result != ECM_SUCCESS) {
-        printf("Failed with %s\n", ecmResultToString(result));
-    }
-
-    /* Terminate remote server thread if remote monitor mode is configured */
-    if((ulConfigFlags & ECM_TEST_FLAG_REMOTE_MONITOR) != 0) {
-        printf("Terminate remote server ...\n");
-        ecmStopRemotingServer();
-    }
-
-    (void)ecmTestCleanup();
-    printf("End\n");
-
-    return 0;
-}
-
 
 /*
 * MOTION CONTROL DETAILS (EXAMPLE FOR RAMP MODE)
@@ -4524,12 +3812,12 @@ int CecmTest::main(int argc, char *argv[])
 //Motion
 */
 
-bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
+bool CecmW::MotionFRampMode(int iLoopTargetPos) {
 
 	//Commands matrix (STATIC!) --> VALIDATED
 	static commandsMatrix ProfilePosMatrix[numCommandsProfilePos] = {
 		pucDio_OperationModeAxis1,	PROFILE_POS_M,
-		pucDio_ControlWordAxis1,	CTRLW_SHUTDOWN,
+		pucDio_ControlWordAxis1,	CTRLW_SWITCHOFF,
 		pucDio_ControlWordAxis1,	CTRLW_SWITCHON,
 		pucDio_ControlWordAxis1,	CTRLW_OPERATION,
 		pucDio_ControlWordAxis1+1,	0x00,//Clear new set-point bit
@@ -4580,12 +3868,12 @@ bool CecmTest::MotionFRampMode(int iLoopTargetPos) {
 	}
 }
 
-bool CecmTest::MotionFProfileVelMode(float fProfileVel_rev_s) {
+bool CecmW::MotionFProfileVelMode(float fProfileVel_rev_s) {
 	
 	//Commands matrix (STATIC!)
 	static commandsMatrix ProfileVelMatrix[numCommandsProfileVel] = {
 		pucDio_OperationModeAxis1,	PROFILE_VEL_M,
-		pucDio_ControlWordAxis1,	CTRLW_SHUTDOWN,
+		pucDio_ControlWordAxis1,	CTRLW_SWITCHOFF,
 		pucDio_ControlWordAxis1,	CTRLW_SWITCHON,
 		pucDio_ControlWordAxis1,	CTRLW_OPERATION,
 		pucDio_ControlWordAxis1+1,	0x00,//Two bytes PROFILE MOTION command: 2nd byte (new set-point bit reset!)
@@ -4626,14 +3914,14 @@ bool CecmTest::MotionFProfileVelMode(float fProfileVel_rev_s) {
 
 }
 
-bool CecmTest::MotionFVelMode(int iTargetVel_inc_s) {
-//bool CecmTest::MotionFVelMode(float fTargetVel) {
+bool CecmW::MotionFVelMode(int iTargetVel_inc_s) {
+//bool CecmW::MotionFVelMode(float fTargetVel) {
 
 	//Commands matrix (STATIC!)
 	static commandsMatrix VelMatrix[numCommandsVel] = {
 		pucDio_ControlWord,		CTRLW_FAULT_RST,//FAULT RESET
 		pucDio_OperationMode,	VEL_M,
-		pucDio_ControlWord,		CTRLW_SHUTDOWN,
+		pucDio_ControlWord,		CTRLW_SWITCHOFF,
 		pucDio_ControlWord,		CTRLW_SWITCHON,
 		pucDio_ControlWord,		CTRLW_OPERATION,
 		pucDio_TargetVelocity,	0x00,//VELOCITY TARGET
@@ -4673,11 +3961,11 @@ bool CecmTest::MotionFVelMode(int iTargetVel_inc_s) {
 
 }
 
-void CecmTest::StatusFaultReset(void) {
+void CecmW::StatusFaultReset(void) {
 	*pucDio_ControlWordAxis1 = 0x80;//dec: 128
 }
 
-void CecmTest::MotionStop(void) {
+void CecmW::MotionStop(void) {
 
 	static const int numCommandsStop = 8;
 	static commandsMatrix StopMatrix[numCommandsStop] = {
@@ -4699,7 +3987,7 @@ void CecmTest::MotionStop(void) {
 //---------
 // GETTERS
 //---------
-short CecmTest::GetStatus(void) {
+short CecmW::GetStatus(void) {
 
 	if (pucDio_StatusWord != NULL)
 		return *(short*)pucDio_StatusWord;	
@@ -4707,7 +3995,7 @@ short CecmTest::GetStatus(void) {
 		return 0;
 }
 
-int CecmTest::GetActPos(void) {
+int CecmW::GetActPos(void) {
 	static int actPos;
 
 	if (pucDio_PositionActual != NULL) {
@@ -4718,30 +4006,30 @@ int CecmTest::GetActPos(void) {
 		return 0;
 }
 
-int CecmTest::GetActVel(void) {
+int CecmW::GetActVel(void) {
 	static int actVel;
 
 	if (pucDio_VelocityActual != NULL) {
 		ecmCpuToLe(&actVel, pucDio_VelocityActual, (const uint8_t *)"\x04\x0");
-		return ( actVel );
+		return actVel;
 	}
 	else
 		return 0;
 }
 
 
-float CecmTest::GetTemperaturePrimary(void) {
+float CecmW::GetTemperaturePrimary(void) {
 	static float priTemperature;
 
 	if (pucDio_PrimaryTemperature != NULL) {
 		ecmCpuToLe(&priTemperature, pucDio_PrimaryTemperature, (const uint8_t *)"\x04\x0");
-		return (priTemperature);
+		return priTemperature;
 	}
 	else
 		return 0;
 }
 
-float CecmTest::GetTemperatureMotor(void) {
+float CecmW::GetTemperatureMotor(void) {
 	static float motorTemperature;
 
 	if (pucDio_PrimaryTemperature != NULL) {
@@ -4752,15 +4040,26 @@ float CecmTest::GetTemperatureMotor(void) {
 		return 0;
 }
 
+int CecmW::GetLastError(void) {
+	static int lastError;
+
+	if (pucDio_LastError != NULL) {
+		ecmCpuToLe(&lastError, pucDio_LastError, (const uint8_t *)"\x04\x0");
+		return lastError;
+	}
+	else
+		return 0;
+}
+
 // 8192 counts/loop
 // gear 1200?
 
-float CecmTest::GetRotorActPos(void) {
+float CecmW::GetModuleActPos(void) {
 	static int rotorPosition;
 
-	if (pucDio_RotorPositionActual != NULL) {
-		ecmCpuToLe(&rotorPosition, pucDio_RotorPositionActual, (const uint8_t *)"\x04\x0");
-		return (rotorPosition);
+	if (pucDio_ModulePositionActual != NULL) {
+		ecmCpuToLe(&rotorPosition, pucDio_ModulePositionActual, (const uint8_t *)"\x04\x0");
+		return (float)rotorPosition;
 	}
 	else
 		return 0;
@@ -4770,20 +4069,20 @@ float CecmTest::GetRotorActPos(void) {
 //---------
 // SETTERS
 //---------
-void CecmTest::SetProfilerMaxVel(float fVel) {
+void CecmW::SetProfilerMaxVel(float fVel) {
 	//static int setVel = (int)fVel;
 
 	if (pucDio_ProfilerMaxVel != NULL) 
 		ecmCpuToLe(pucDio_ProfilerMaxVel, &fVel, (const uint8_t *)"\x04\x0");
 }
-void CecmTest::SetProfilerMaxAcc(float fAcc) {
+void CecmW::SetProfilerMaxAcc(float fAcc) {
 	//static int setAcc = (int)fAcc;
 
 	if (pucDio_ProfilerMaxAcc != NULL) 
 		ecmCpuToLe(pucDio_ProfilerMaxAcc, &fAcc, (const uint8_t *)"\x04\x0");
 }
 
-void CecmTest::SetProfilerMaxDec(float fDec) {
+void CecmW::SetProfilerMaxDec(float fDec) {
 	//static int setDec = (int)fDec;
 
 	if (pucDio_ProfilerMaxDec != NULL) 
@@ -4791,13 +4090,7 @@ void CecmTest::SetProfilerMaxDec(float fDec) {
 }
 
 //Sets Profiler limits
-
-/*
-*	@brief Sets Profiler limits
-*
-*	@param fLoopMaxVel	Profiler Max. Velocity in [rev/s]
-*/
-void CecmTest::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
+void CecmW::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
 	SetProfilerMaxVel(*fLoopMaxVel);
 	SetProfilerMaxAcc(*fLoopMaxAcc);
 	SetProfilerMaxDec(*fLoopMaxAcc);

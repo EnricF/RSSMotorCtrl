@@ -4,7 +4,14 @@
 
 #pragma once
 
-#include "ecmTest.h" //Add class header
+//EF mod: use only to pass compilation while code editing
+#ifndef CV_PI
+#define CV_PI 3.14159265359
+#endif
+
+//Other variables
+#include "globalVar.h"
+
 
 // CRSSMotorCtrlDlg dialog
 class CRSSMotorCtrlDlg : public CDialogEx
@@ -56,7 +63,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//									ETHERCAT SLAVE OBJECTS						//
 		//////////////////////////////////////////////////////////////////////////////////
 
-		CecmTest					cecmTest;//EtherCAT slave
+		CecmW						cecmW;//EtherCAT worker/link
 
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -107,13 +114,13 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_CURC		18								//Device Module CAN errors
 		#define						DEV_CURERR		19								//Current Error
 
+		//EXECUTE MOTION (TYPES)
 		#define						DEV_M_STOP		0
 		#define						DEV_M_POS		1
 		#define						DEV_M_VEL		2			
 		#define						DEV_M_ROTOR		3				
 		#define						DEV_M_PWM		4
 		#define						DEV_M_STEP		5
-
 
 		//Real parameters - Motor model 400
 		#define						MOTOR_VEL_DR_REV_S	400	//Motor velocity dynamic range
@@ -159,6 +166,51 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		bool						bUpdateConfig;
 
 		//////////////////////////////////////////////////////////////////////////////////
+		//									RECORD GLOBAL								//
+		//////////////////////////////////////////////////////////////////////////////////
+		CString						genericFolder	= "C:\\workspace\\Data\\Motor\\%s";	//For all log files over time
+		CString						uniqueFolder	= "%s\\%s";							//It has DATE information
+
+		//////////////////////////////////////////////////////////////////////////////////
+		//									RECORD DEVICE								//
+		//////////////////////////////////////////////////////////////////////////////////
+		void						RecordDeviceData();
+
+		/*
+		* Sets variables set to their default start values
+		*/
+		void						InitRecordDeviceData();
+
+		bool						recCurData;		// True if Device recording is selected, false otherwise
+		long						recCurSample;	// Iterator counter
+		__int64						recCurITime;	// Timestamps from CPU
+		CFile						curDataFile;	// The file where Device Data is stored
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//									RECORD TEMPERATURE							//
+		//////////////////////////////////////////////////////////////////////////////////
+
+		#define						TEMPS				4	//¿?
+		#define						TEMP_T1				0
+		#define						TEMP_T2				1
+		#define						TEMP_T3				2
+		#define						TEMP_M				3
+
+		bool						bRecordTemp;		// True if Temperature recording is selected, false otherwise
+		CFile						fTempInfo;			// The file where Temperature readings are stored
+		int							iDataTempRecord;	// iterator counter
+		__int64						iTimeStamp;			// Timestamps from CPU
+
+		double						dTemps[TEMPS];		//¿?
+
+		/*
+		* Sets variables set to their default start values
+		*/
+		void						InitRecordTemp();
+
+		void						RecordTemp();
+
+		//////////////////////////////////////////////////////////////////////////////////
 		//							      GLOBAL FUNCTIONS								//
 		//////////////////////////////////////////////////////////////////////////////////
 
@@ -172,8 +224,8 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int							lowPriorityParams;		//1: Set 1 | 2: Set2 
 
 		//ENCODERS dynamic ranges [counts/loop]: Motor and Rotor
-		#define ENC_MOTOR_DR 65535.	//16-bits
-		#define ENC_ROTOR_DR 8192.	//13-bits
+		#define ENC_MOTOR_DR	65535.	//16-bits
+		#define ENC_MODULE_DR	8192.	//13-bits
 
 		//Auxiliar temperatures
 		#define MOTOR_AUX_TEMPS				7
@@ -206,17 +258,15 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		*/
 		void						GetDeviceParameters();
 		/*
+		* Updates Interface Controls by calling function ShowUpdate() once for each selected field
+		* @param pObject	A pointer of class CRSSMotorCtrlDlg
+		*/
+		void						UpdateInterfaceControls();
+		/*
 		* Writes readings from motorParameters[][] matrix to EDITBOXES in GUI
 		*/
 		void						UpdateInterfaceParameters();
-		void						RecordDeviceData();
-		void						InitRecordDeviceData();
-
-		bool						recCurData;										//Indicates current data recording
-		long						recCurSample;
-		__int64						recCurITime;
-		CFile						curDataFile;
-
+		
 		//////////////////////////////////////////////////////////////////////////////////
 		//									LOOP CONTROL								//
 		//////////////////////////////////////////////////////////////////////////////////
@@ -231,20 +281,20 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		bool						bLoopStart;
 		//EDIT BOXES
-		float						fLoopInitial;	//[absolute encoder counts]
-		float						fLoopUpper;		//[absolute encoder counts]
-		float						fLoopLower;		//[absolute encoder counts]
+		float						fLoopInitial;	//[encoder counts - Motor(inner)]
+		float						fLoopUpper;		//[encoder counts - Motor(inner)]
+		float						fLoopLower;		//[encoder counts - Motor(inner)]
 		int							iLoopDelay;
 		int							iLoopState;
 		
 		
 		//#define						LOOP_MIN_ERROR_RAD			0.0017 //[rad]
-		#define						LOOP_MIN_ERROR_ENC			655 //[encoder counts]
+		#define						LOOP_MIN_ERROR_ENC			655 //[absolute encoder counts - external]
 
-		float						fLoopPos;		//[absolute radians]
-		int							iLoopPos;		//[encoder absolute position]
-		float						fLoopTargetPos;	//[absolute radians]
-		int							iLoopTargetPos;	//[encoder absolute position]
+		float						fLoopPos;		//[encoder counts - Motor(inner)]
+		int							iLoopPos;		//[encoder counts - Motor(inner)]
+		float						fLoopTargetPos;	//[encoder counts - Motor(inner)]
+		int							iLoopTargetPos;	//[encoder counts - Motor(inner)]
 		float						fLoopMaxVel;	//[rev/s]
 		float						fLoopMaxAcc;	//[rev/s^2]
 		
@@ -278,10 +328,12 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		/*
 		* 		Takes a value from and edit box and sets its associated variable
 		*		It is able to read on different units selection
+		*		It multiplies internal value by gear factor
+		*
 		*		@param	id_editbox		EditBox Numerical ID
 		*		@param	var				Pointer to the variable to be written
 		*/
-		void						setLoopValue(int id_editbox, float * var);
+		void						SetLoopValue(int id_editbox, float * var);
 
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -346,27 +398,34 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg void OnBnClickedOk();
 		afx_msg void OnBnClickedButtonRampStartloop();
 		afx_msg void OnBnClickedButtonVelSetVelRpm();
-		afx_msg void OnBnClickedButtonVelSetVelAcc2();
+		//afx_msg void OnBnClickedButtonVelSetVelAcc2();
 		afx_msg void OnBnClickedButtonVelStart();
-		afx_msg void OnBnClickedButton1();
 
 		//Sliders
 		afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);		
 		CSliderCtrl scVelocity;	// Velocity slider inside Velocity Motion group							
 		CSliderCtrl scAcceleration;// Acceleration control slider in Velocity Motion group
 		afx_msg void OnBnClickedButtonVelSetVel();
-		afx_msg void OnBnClickedStaticRamp3();
+		//afx_msg void OnBnClickedStaticRamp3();
+		/*
+		* Device Data record file header openning/closing and header rows writing
+		*/
 		afx_msg void OnBnClickedButtonRecData();
 
 		// Units selection in "Ramp motion - Upper Position" field
 		CComboBox cmbRampUpUnitsSel;
 		afx_msg void OnCbnSelchangeComboRampUpUnits();
 		afx_msg void LoadComboBox();
-		enum cmbUnits {	COUNTS, RADIANS	};
+		enum cmbUnits {	DEGREES, COUNTS, RADIANS };
 
 		// Picture "Semaphore" to shos STATUS register. YELLOW at start, RED if STATUS_FAULT_BIT == 1, GREEN otherwise
 		CBitmap picStatusSemaphore;
 		afx_msg void OnBnClickedButtonDevFaultReset();
 		afx_msg void OnBnClickedButtonVelSetVelAcc();
 		afx_msg void OnBnClickedCancel();
+
+		/*
+		* Temperature record file header openning/closing and header rows writing
+		*/
+		afx_msg void OnBnClickedButtonRecT();
 };

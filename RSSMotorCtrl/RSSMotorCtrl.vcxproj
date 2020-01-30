@@ -202,7 +202,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bethercat.h" />
-    <ClInclude Include="ecmTest.h" />
+    <ClInclude Include="ecmW.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="globalVar.h" />
     <ClInclude Include="pch.h" />
@@ -212,7 +212,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ecmTest.c" />
+    <ClCompile Include="ecmW.c" />
     <ClCompile Include="getopt_long.c" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -231,6 +231,10 @@
     <Image Include="res\StatusSemaphoreYellow.bmp" />
     <Image Include="res\StatusSemaphoreGreen.bmp" />
     <Image Include="res\RSSMotorCtrl.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClassDiagram.cd" />
+    <None Include="ClassDiagram1.cd" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
