@@ -79,19 +79,20 @@
 // ETHERCAT Parameters ID's
 
 //---- SHUNK
-#define BETH_PARAM_DR_HOMEOFFSET				0x00
-#define BETH_PARAM_DR_GEARRATIO                 0x01	
-#define BETH_PARAM_DR_MINPOS					0x03
-#define BETH_PARAM_DR_MAXPOS					0x04
+#define BETH_PARAM_DR_HOMEOFFSET				0x00	// Home offset [encoder counts] - inner or outter?
+#define BETH_PARAM_DR_GEARRATIO                 0x01	// DR: Gear Ratio [#]
+#define BETH_PARAM_DR_MINPOS					0x03	// DR: Module Min. Position	[rev] - outter
+#define BETH_PARAM_DR_MAXPOS					0x04	// DR: Module Max. Position	[rev] - outter
 #define BETH_PARAM_DR_MAXDELTAPOS				0x05
 #define BETH_PARAM_DR_MAXDELTAVEL				0x06
 #define BETH_PARAM_DR_TORQUERATIO				0x07
-#define BETH_PARAM_DR_MINVEL					0x09	//Motor Min. Vel.
-#define BETH_PARAM_DR_MAXVEL					0x0A	//Motor Max. Vel.
-#define BETH_PARAM_DR_MINACC					0x0B	//Motor Min. Acc.
-#define BETH_PARAM_DR_MAXACC					0x0C	//Motor Max. Acc. ==> Min/Max Deceleration? Where?
-#define BETH_PARAM_DR_MINCUR					0x0D
-#define BETH_PARAM_DR_MAXCUR					0x0E
+		//Are those specifications?
+#define BETH_PARAM_DR_MINVEL					0x09	// DR: Motor Min. Vel.	[rev/s]		--> Must be a negative value
+#define BETH_PARAM_DR_MAXVEL					0x0A	// DR: Motor Max. Vel.	[rev/s]
+#define BETH_PARAM_DR_MINACC					0x0B	// DR: Motor Min. Acc.	[rev/s^2]	--> Must be a negative Value
+#define BETH_PARAM_DR_MAXACC					0x0C	// DR: Motor Max. Acc.	[rev/s^2]	--> Min/Max Deceleration? Where?
+#define BETH_PARAM_DR_MINCUR					0x0D	// DR: Motor Min. Current [A]
+#define BETH_PARAM_DR_MAXCUR					0x0E	// DR: Motor Max. Current [A]
 #define BETH_PARAM_DR_HOMEVEL					0x0F
 #define BETH_PARAM_DR_HOMEACC					0x10
 #define BETH_PARAM_DR_RSSSERIAL                 0x1A
@@ -116,23 +117,27 @@
 #define BETH_PARAM_AW_RAWCUR                    0x35
 #define BETH_PARAM_AW_CONFIG                    0x39
 #define BETH_PARAM_AR_MOVEMODE                  0x3a
-#define BETH_PARAM_AR_ACTPOS                    0x3c
-#define BETH_PARAM_AR_ACTPOS_                   0x3d
+#define BETH_PARAM_AR_ACTPOS                    0x3c	//Motor Actual Position [encoder counts]
+#define BETH_PARAM_AR_ACTPOS_                   0x3d	//¿?
 #define BETH_PARAM_AR_IPOLPOS                   0x3e
 #define BETH_PARAM_AR_DELTAPOS                  0x3f
 #define BETH_PARAM_AW_MAXDELTAPOS               0x40
-#define BETH_PARAM_AR_ACTVEL                    0x41
+#define BETH_PARAM_AR_ACTVEL                    0x41	//Motor Actual Velocity [encoder counts/s]
 #define BETH_PARAM_AR_IPOLVEL                   0x42
-#define BETH_PARAM_AR_ACTACC                    0x44
-#define BETH_PARAM_AW_MINPOS                    0x45
-#define BETH_PARAM_AW_MAXPOS                    0x46
-#define BETH_PARAM_AW_MAXVEL                    0x48
-#define BETH_PARAM_AW_MAXACC                    0x4a
-#define BETH_PARAM_AW_MAXCUR                    0x4c
-#define BETH_PARAM_AW_CUR                       0x4d
+#define BETH_PARAM_AR_ACTACC                    0x44	//Motor Actual Acceleration [encoder counts/s^2]
+#define BETH_PARAM_AW_MINPOS                    0x45	//Motor Minimum Position reached [encoder counts]
+#define BETH_PARAM_AW_MAXPOS                    0x46	//Motor Maximum Position reached [encoder counts]
+#define BETH_PARAM_AW_MAXVEL                    0x48	//Motor Maximum Velocity reached[encoder counts/s]
+#define BETH_PARAM_AW_MAXACC                    0x4a	//Motor Maximum Acceleration reached [encoder counts/s^2]
+#define BETH_PARAM_AW_MAXCUR                    0x4c	//Motor Maximum Current reached[A?]
+#define BETH_PARAM_AW_CUR                       0x4d	//Motor Actual Current [A?]????????????
 #define BETH_PARAM_AW_TARGETPOS                 0x4e
 #define BETH_PARAM_AW_TARGETVEL                 0x4f
 #define BETH_PARAM_AW_TARGETACC                 0x50
+#define BETH_PARAM_AW_CURA                      0x51	//Motor Actual Current phase-A [A]
+#define BETH_PARAM_AW_CURB                      0x52	//Motor Actual Current phase-B [A]
+#define BETH_PARAM_AW_CURC	                    0x53	//Motor Actual Current phase-C [A]
+//mod (two previous ones are a test)
 #define BETH_PARAM_AR_DEFC0                     0x51
 #define BETH_PARAM_AR_DEFDAMP                   0x52
 #define BETH_PARAM_AR_DEFA0                     0x53
@@ -156,6 +161,14 @@
 #define BETH_PARAM_AR_ACTIIPOLVEL				0x6A
 
 //RSS Parameters
+#define BETH_PARAM_AR_ACTMODULEPOS              0xE0	//Module Actual Position [encoder counts]			- Absolute!
+#define BETH_PARAM_AR_ACTMODULEVEL              0xE1	//Module Actual Velocity [encoder counts/s]			- Absolute!
+#define BETH_PARAM_AR_ACTMODULEACC              0xE2	//Module Actual Acceleration [encoder counts/s^2]	- Absolute!
+#define BETH_PARAM_AW_TARGETMODULEPOS			0xE3	//Module TARGET Position [encoder counts]			- Absolute!
+#define BETH_PARAM_AW_TARGETMODULEVEL			0xE4	//Module TARGET Velocity [encoder counts/s]			- Absolute!
+#define BETH_PARAM_AW_TARGETMODULEACC			0xE5	//Module TARGET Acceleration [encoder counts/s^2]	- Absolute!
+
+//old (new above)
 #define BETH_PARAM_AR_ACTROTORPOS               0xE0
 #define BETH_PARAM_AR_ACTROTORVEL               0xE1
 #define BETH_PARAM_AR_ACTROTORACC               0xE2
@@ -188,7 +201,7 @@
 #define BETH_PARAM_AR_ACT_RAWTEMP				0x6E
 #define BETH_PARAM_AR_ACT_FMOTOR_CUR            0x70
 #define BETH_PARAM_AR_ACT_FMOTOR_SUPPLY         0x71
-#define BETH_PARAM_AR_ACT_FTEMP					0x72
+#define BETH_PARAM_AR_ACT_FTEMP					0x72	//Motor Temperature [ºC]
 #define BETH_PARAM_AR_ACT_FLOGIC_SUPPLY         0x73
 #define BETH_PARAM_AR_ACT_MIN_LOGIC_SUPPLY  	0x74
 #define BETH_PARAM_AR_ACT_MAX_LOGIC_SUPPLY		0x75
@@ -199,10 +212,9 @@
 #define BETH_PARAM_AW_ACT_MIN_TEMP              0x85
 
 
-
-#define BETH_PARAM_AW_TARGET_POS				0x4E
-#define BETH_PARAM_AW_TARGET_VEL				0x4F	
-#define BETH_PARAM_AW_TARGET_ACC				0x50	
+#define BETH_PARAM_AW_TARGET_POS				0x4E	//Motor Target Position [encoder counts]
+#define BETH_PARAM_AW_TARGET_VEL				0x4F	//Motor Target Velocity [rev/s]
+#define BETH_PARAM_AW_TARGET_ACC				0x50	//Motor Target Velocity [rev/s^2]
 
 
 //---- RSS
@@ -248,7 +260,7 @@
 #define BETH_PARAM_AR_ACT_IMODULE				0xD0
 #define BETH_PARAM_AR_ACT_IMOTOR				0xD1
 #define BETH_PARAM_AR_ACT_CONTROL				0xD2
-#define BETH_PARAM_AR_ACT_TEMP					0xD3
+#define BETH_PARAM_AR_ACT_TEMP					0xD3	//Primary/Driver temperature [ºC]
 #define BETH_PARAM_AR_TARGET_IMOTOR				0xD4
 #define BETH_PARAM_AR_PARAM_IMOTOR				0xD5
 #define BETH_PARAM_AR_ACT_VOLT					0xD6

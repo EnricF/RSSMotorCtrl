@@ -19,6 +19,16 @@
 #include <strsafe.h>
 #include <tchar.h>
 
+//Log with PLOG
+#include <plog/Log.h>// include the header for LOG! (https://github.com/SergiusTheBest/plog)
+
+//LOG control
+#ifdef _DEBUG
+#define LOG_LEVEL	plog::verbose
+#else
+#define LOG_LEVEL	plog::info
+#endif
+
 #define NUMCOMMANDS 2 //How many acyclic commands you want to send;
 
 //----------------------------

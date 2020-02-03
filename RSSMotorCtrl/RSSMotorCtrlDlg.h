@@ -80,39 +80,32 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//////////////////////////////////////////////////////////////////////////////////
 
 		//Definitions
-		#define						DEV_FIELDS		5								//Device Control Fields
-		#define						DEV_ACT			0								//Actual paramater value
-		#define						DEV_TARGET		1								//Target parameter value
-		#define						DEV_MIN			2								//Actual Min paramenter value
-		#define						DEV_MAX			3								//Actual Max parameter value
-		#define						DEV_RANGE		4								//Max parameter range value
+		#define						DEV_FIELDS		5	//Device Control Fields (TOTAL)
+		#define						DEV_ACT			0	//Actual paramater value
+		#define						DEV_TARGET		1	//Target parameter value
+		#define						DEV_MIN			2	//Minimum reached value
+		#define						DEV_MAX			3	//Maximum reached value
+		#define						DEV_RANGE		4	//Range from specifications?
 
-		#define						DEV_PARAMS		20								//Device Parameters
-		#define						DEV_IND			8								//Device Individual Parameters	- exclusive for each drive/motor
-		#define						DEV_NONE		0								//Device Module None			
-		#define						DEV_POS			1								//Device Module Position
-		#define						DEV_VEL			2								//Device Module Velocity
-		#define						DEV_ACC			3								//Device Module Acceleration
-		#define						DEV_MPOS		4								//Device Motor Position
-		#define						DEV_MVEL		5								//Device Motor Velocity
-		#define						DEV_MACC		6								//Device Motor Acceleration
-		#define						DEV_AMP			7								//Device Module Amplitude
-		#define						DEV_CUR			8								//Device Module Current			- Common to all drives/motors
-		#define						DEV_MTEMP		9								//Device Motor Temperature	
-		#define						DEV_TPC			9								//Device Module TPC cycle
-		//#define						DEV_TPC_SEC		10								//Device Module TPC cycle secondary thread
-		#define						DEV_TEMP		10								//Device Module Temperature
-		#define						DEV_CTRL		11								//Device Module Control Parameters
-		#define						DEV_CAN			12								//Device Module CAN errors
-		#define						DEV_DELTAVEL	12								//Device Module CAN errors
-		#define						DEV_PARAM1		13								//Device Module CAN errors
-		#define						DEV_PARAM2		14								//Device Module CAN errors
-		#define						DEV_PARAM3		15								//Device Module CAN errors
-		#define						DEV_STATUS		15								//Device Module Status word
-		#define						DEV_CURA		16								//Device Module CAN errors
-		#define						DEV_CURB		17								//Device Module CAN errors
-		#define						DEV_CURC		18								//Device Module CAN errors
-		#define						DEV_CURERR		19								//Current Error
+		#define						DEV_PARAMS		20	//Device TOTAL Parameters
+		#define						DEV_IND			8	//Device Individual Parameters	- exclusive for each drive/motor
+		#define						DEV_NONE		0								//None????????		
+		#define						DEV_POS			1	//Module Position
+		#define						DEV_VEL			2	//Module Velocity
+		#define						DEV_ACC			3	//Module Acceleration
+		#define						DEV_MPOS		4	//Motor Position
+		#define						DEV_MVEL		5	//Motor Velocity
+		#define						DEV_MACC		6	//Motor Acceleration
+		#define						DEV_AMP			7								//Module Amplitude???????
+				//Extra
+		#define						DEV_CUR			8								//Device Module Current?
+		#define						DEV_MTEMP		9	//Motor Temperature	
+		#define						DEV_TEMP		10	//Drive Temperature
+		#define						DEV_STATUS		15	//Drive Status word
+		#define						DEV_CURA		16	//Motor Current phase-A [A]
+		#define						DEV_CURB		17	//Motor Current phase-B [A]
+		#define						DEV_CURC		18	//Motor Current phase-C [A]
+		#define						DEV_CURERR		19								//Current Error?????
 
 		//EXECUTE MOTION (TYPES)
 		#define						DEV_M_STOP		0
@@ -401,6 +394,11 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//afx_msg void OnBnClickedButtonVelSetVelAcc2();
 		afx_msg void OnBnClickedButtonVelStart();
 
+		/* 
+		* Initializes main LOG object and allows to CecmW class to use it
+		*/
+		void InitLog();
+
 		//Sliders
 		afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);		
 		CSliderCtrl scVelocity;	// Velocity slider inside Velocity Motion group							
@@ -428,4 +426,5 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		* Temperature record file header openning/closing and header rows writing
 		*/
 		afx_msg void OnBnClickedButtonRecT();
+		afx_msg void OnBnClickedButtonDevBrake();
 };

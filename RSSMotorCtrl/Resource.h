@@ -77,7 +77,7 @@
 #define IDC_EPMIN6                      1062
 #define IDC_STATIC_DEV_GRATIO           1063
 #define IDC_STATIC_STATUS_SEMAPHORE     1064
-#define IDC_EDIT_PARAM_T_MAX			1067
+#define IDC_EDIT_PARAM_T_MAX            1067
 #define IDC_EDIT_PARAM_T_MIN            1068
 #define IDC_EDIT_PARAM_T_ACT            1069
 #define IDC_EDIT_PARAM_TM_ACT           1070
@@ -95,6 +95,11 @@
 #define IDC_STATIC_PARAM_ACCM           1082
 #define IDC_STATIC_PARAM_POSM           1083
 #define IDC_EDIT_REC_TEMPTIMELAPSE      1084
+#define IDC_STATIC_PARAM_CURRENTA       1085
+#define IDC_STATIC_PARAM_CURRENTB       1086
+#define IDC_STATIC_PARAM_CURRENTC       1087
+#define IDC_EDIT_PARAM_TM_MIN           1088
+#define IDC_EDIT_PARAM_TM_MAX           1089
 #define IDC_EPMAX1                      1093
 #define IDC_EPMAX2                      1094
 #define IDC_EPMAX3                      1095
@@ -107,6 +112,17 @@
 #define IDC_BUTTON_DEV_FAULT_RESET      1103
 #define IDC_STATIC_TEMP_SHOWDATA        1104
 #define IDC_STATIC_PARAM_MAX            1105
+#define IDC_BUTTON_DEV_FAULT_RESET2     1106
+#define IDC_BUTTON_DEV_BRAKE            1106
+#define IDC_EPA16                       1110
+#define IDC_EPA17                       1111
+#define IDC_EPA18                       1112
+#define IDC_EPMIN16                     1113
+#define IDC_EPMIN17                     1114
+#define IDC_EPMIN18                     1115
+#define IDC_EPMAX16                     1116
+#define IDC_EPMAX17                     1117
+#define IDC_EPMAX18                     1118
 
 // Next default values for new objects
 // 

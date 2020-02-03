@@ -2,4 +2,3 @@ Creating log file logFile.txt
 EtherCAT master test application V1.7.0
 (c) 2008-2015 esd electronic system design gmbh
 
-ENI configuration file selected: C:\workspace\Base_project_EVE-NET_Master_Config.xml

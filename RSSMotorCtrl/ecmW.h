@@ -4,9 +4,9 @@
 #include "ecm.h"
 //#include "RobGUI.h"
 
-
 #ifndef ECMW_H
 #define ECMW_H
+
 
 #if defined(__cplusplus)
 extern "C" {//"C" mode
@@ -14,7 +14,7 @@ extern "C" {//"C" mode
 //Solved from link: https://stackoverflow.com/questions/30581837/linker-error-when-calling-a-c-function-from-c-code-in-different-vs2010-project
 //This file/class must be compiled as "C"
 
-/*
+
 //EtherCAT command types, numerically identified
 typedef enum ethercatCommandTypes
 {
@@ -24,7 +24,7 @@ typedef enum ethercatCommandTypes
 	LRD, LWR, LRW,
 	ARMW
 }ethercatCommandTypes;
-
+/*
 struct cmd
 {
 	ECM_SLAVE_ADDR			address;
@@ -34,12 +34,12 @@ struct cmd
 };
 */
 
-
 class CecmW {
 
 //VARIABLES SECTION
 	public:
-	//private:
+	private:
+
 	//protected:
 		
 //FUNCTIONS SECTION
@@ -100,6 +100,14 @@ class CecmW {
 		*/
 		void StatusFaultReset(void);
 
+
+		/*
+		* Sends Asynchronous Requests to EtherCAT Slave (p.109)
+		*
+		* @return	On success, the function returns ECM_SUCCESS. On error, one of the error codes available
+		*/
+		static int SendAsyncRequest(void *pData, uint8_t cmdType, ECM_SLAVE_ADDR regAddress, uint16_t numBytes, uint16_t *pucCnt);
+
 		//---------------------------
 		// Device Parameters GETTERS
 		//---------------------------
@@ -109,6 +117,14 @@ class CecmW {
 		static float	GetTemperaturePrimary(void);//Axis1 register - Drive
 		static float	GetTemperatureMotor(void);	//Axis1 register - Motor
 		static float	GetModuleActPos(void);		//Axis1 register - Module(outter)
+		
+		/*
+		* Gets "Current[A]" readings (A, B and C phases) from Driver/Motor
+		* @param *cA	A pointer where CurrentA must be saved (typ. at motorParameters[])
+		* @param *cB	A pointer where CurrentB must be saved
+		* @param *cC	A pointer where CurrentC must be saved
+		*/
+		static void		GetCurrentsABC(double *cA, double *cB, double *cC);
 		static int		GetLastError(void);			//Axis1 register
 
 		//---------------------------
