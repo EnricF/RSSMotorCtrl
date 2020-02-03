@@ -170,11 +170,11 @@ UINT ThreadWorker(LPVOID pParam)
 		QueryPerformanceCounter((LARGE_INTEGER*)&initial);
 		
 		////////////////////////////////////////
-		// COMMANDS
+		// COMMANDS - Does nothing by now (To be upgraded)
 		pObject->ExecuteCommands();
 
 		////////////////////////////////////////
-		// MOTION
+		// MOTION - Main MOTION loop, calls either position or velocity motion modes
 		pObject->ExecuteMotion();
 
 		////////////////////////////////////////
@@ -841,42 +841,13 @@ void CRSSMotorCtrlDlg::GetDefaultDeviceParameters()
 void CRSSMotorCtrlDlg::ExecuteCommands()
 {
 	//Set Module Zero Offset
-	/*SetModuleZero();
+	//SetModuleZero();
 
 	//Set Rotor Zero Offset
-	SetRotorZero();*/
+	//SetRotorZero();
 
 	//Set Gear Ratio
 	SetGearRatio();
-
-	//Set CAN1Id Command
-	/*SetCAN1Id();
-
-	//Set CAN1Id Command
-	SetCAN2Id();
-
-	//Set Serial Command
-	SetSerial();
-
-	//Amplitude Control
-	UpdateAmplitudeControl();
-
-	//Update Module Config
-	UpdateModuleConfig();
-
-	//Set current offsets
-	if (bSetCurrentOffsets)
-	{
-		cCanESD.SetCurrentOffsets(iCanId, GetDlgItemInt(IDC_PWM_SINA), GetDlgItemInt(IDC_PWM_SINB), GetDlgItemInt(IDC_PWM_SINC));
-		bSetCurrentOffsets = false;
-	}
-
-	//Set current offsets
-	if (bSetCurrentZeros)
-	{
-		cCanESD.SetCurrentZeros(iCanId, GetDlgItemInt(IDC_PWM_IA), GetDlgItemInt(IDC_PWM_IB), GetDlgItemInt(IDC_PWM_IC));
-		bSetCurrentZeros = false;
-	}*/
 }
 
 void CRSSMotorCtrlDlg::ExecuteMotion()

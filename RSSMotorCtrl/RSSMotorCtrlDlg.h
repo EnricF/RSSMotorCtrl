@@ -287,7 +287,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		float						fLoopPos;		//[encoder counts - Motor(inner)]
 		int							iLoopPos;		//[encoder counts - Motor(inner)]
 		float						fLoopTargetPos;	//[encoder counts - Motor(inner)]
-		int							iLoopTargetPos;	//[encoder counts - Motor(inner)]
+		int							iLoopTargetPos;	//[encoder counts - Motor(inner)] - MOTOR INPUT
 		float						fLoopMaxVel;	//[rev/s]
 		float						fLoopMaxAcc;	//[rev/s^2]
 		
@@ -335,7 +335,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		bool						velRunning;
 		int							velTargetRPM;// Velocity Target in [rpm]
-		double						velTargetVel;// Velocity Target in [rev/s]
+		double						velTargetVel;// Velocity Target in [rev/s] - MOTOR INPUT
 		double						velTargetAcc;
 
 		int							velTargetVelValue; // Velocity Target in [rpm] with and offset of 7500
