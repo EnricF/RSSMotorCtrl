@@ -24,6 +24,20 @@ typedef enum ethercatCommandTypes
 	LRD, LWR, LRW,
 	ARMW
 }ethercatCommandTypes;
+
+typedef struct PDmapP {
+	uint8_t *pucDio_DisplayOperationMode;//"Operation mode display" pointer		(CiA)
+	uint8_t *pucDio_PrimaryTemperature;//"Primary temperature value" pointer	(Axis1)
+	uint8_t *pucDio_MotorTemperature;//"Motor temperature value" pointer		(Axis1)
+	uint8_t *pucDio_ModulePositionActual;//"BISS-C slave 1 / Primary SSI-Position" pointer (Axis1) - Module(outter)
+	uint8_t *pucDio_BusVoltage;//"Bus voltage value" pointer			0x2060(Axis1) - Drive
+	uint8_t *pucDio_LastError;//"Last error" pointer					(Axis1)
+	uint8_t *pucDio_StatusWordAxis1;//"Status mode" pointer					(Axis1)
+	uint8_t *pucDio_CurrentA;//"Current A" pointer					(Axis1)
+	uint8_t *pucDio_CurrentB;//"Current B" pointer					(Axis1)
+	uint8_t *pucDio_CurrentC;//"Current C" pointer					(Axis1)
+}PDmapP, *PPDmapP;
+
 /*
 struct cmd
 {
@@ -125,6 +139,17 @@ class CecmW {
 		* @param *cC	A pointer where CurrentC must be saved
 		*/
 		static void		GetCurrentsABC(double *cA, double *cB, double *cC);
+
+		/*
+		* Gets "Bus voltage value [V]" reading from Drive/Motor
+		* @return		Bus voltage [V]
+		*/
+		static float	GetBusVoltage(void);
+
+		/*
+		* Gets "Last error" register
+		* @return		Last error code (decimal)
+		*/
 		static int		GetLastError(void);			//Axis1 register
 
 		//---------------------------

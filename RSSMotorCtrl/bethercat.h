@@ -137,7 +137,8 @@
 #define BETH_PARAM_AW_CURA                      0x51	//Motor Actual Current phase-A [A]
 #define BETH_PARAM_AW_CURB                      0x52	//Motor Actual Current phase-B [A]
 #define BETH_PARAM_AW_CURC	                    0x53	//Motor Actual Current phase-C [A]
-//mod (two previous ones are a test)
+#define BETH_PARAM_AW_BUSV	                    0x54	//Drive Bus Voltage [V]
+//mod (four previous ones are being tested)
 #define BETH_PARAM_AR_DEFC0                     0x51
 #define BETH_PARAM_AR_DEFDAMP                   0x52
 #define BETH_PARAM_AR_DEFA0                     0x53

@@ -146,10 +146,10 @@
 /*----------------------------------------------------------------------*/
 
 /* Prevent MS VC8 compiler and later warnings about deprecated CRT function */
-/*#if (_MSC_VER >= 1400)
+#if (_MSC_VER >= 1400)
 # define _CRT_SECURE_NO_DEPRECATE
 # define _CRT_SECURE_NO_WARNINGS
-#endif*/
+#endif
 
 //EF mod: Windows requires it
 #include "pch.h"
@@ -510,13 +510,14 @@ static uint8_t *pucDio_PositionSetPoint		= NULL;//"Target position" pointer	0x20
 static uint8_t *pucDio_VelocitySetPoint		= NULL;//"Target velocity" pointer	0x2021 (Axis1) - Motor(inner)
 
 //Readings from slave
-static uint8_t *pucDio_StatusWord		= NULL;//"Status mode" pointer						(CiA)
-static uint8_t *pucDio_PositionActual	= NULL;//"Position actual" pointer					(CiA) - Motor(inner)
-static uint8_t *pucDio_VelocityActual	= NULL;//"Velocity actual" pointer					(CiA) - Motor(inner)
+static uint8_t *pucDio_StatusWord			= NULL;//"Status mode" pointer					(CiA)
+static uint8_t *pucDio_PositionActual		= NULL;//"Position actual" pointer				(CiA) - Motor(inner)
+static uint8_t *pucDio_VelocityActual		= NULL;//"Velocity actual" pointer				(CiA) - Motor(inner)
 static uint8_t *pucDio_DisplayOperationMode = NULL;//"Operation mode display" pointer		(CiA)
 static uint8_t *pucDio_PrimaryTemperature	= NULL;//"Primary temperature value" pointer	(Axis1)
 static uint8_t *pucDio_MotorTemperature		= NULL;//"Motor temperature value" pointer		(Axis1)
 static uint8_t *pucDio_ModulePositionActual	= NULL;//"BISS-C slave 1 / Primary SSI-Position" pointer (Axis1) - Module(outter)
+static uint8_t *pucDio_BusVoltage			= NULL;//"Bus voltage value" pointer			0x2060(Axis1) - Drive
 static uint8_t *pucDio_LastError			= NULL;//"Last error" pointer					(Axis1)
 static uint8_t *pucDio_StatusWordAxis1		= NULL;//"Status mode" pointer					(Axis1)
 static uint8_t *pucDio_CurrentA				= NULL;//"Current A" pointer					(Axis1)
@@ -2657,6 +2658,8 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
     /*
      * Get reference to virtual variables
      */
+
+
     result = ecmLookupVariable(hndMaster, ".DevState", &VarDesc, ECM_FLAG_GET_FIRST);
     if (ECM_SUCCESS == result) {
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
@@ -2733,7 +2736,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
             fprintf(stdout,"Failed to get reference to virtual variable WcState\n");
         }
 #endif
-    }
+    }	
 
 	//Get Status Word (CiA)
 	result = ecmLookupVariable(hndMaster, "Statusword", &VarDesc,
@@ -2743,7 +2746,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_StatusWord);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Statusword\n");
+			fprintf(stdout, "Failed to get reference to variable 'Statusword'\n");
 		}
 #endif
 	}	
@@ -2756,7 +2759,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_PositionActual);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Position actual\n");
+			fprintf(stdout, "Failed to get reference to variable 'Position actual'\n");
 		}
 #endif
 	}
@@ -2769,7 +2772,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_VelocityActual);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Velocity actual\n");
+			fprintf(stdout, "Failed to get reference to variable 'Velocity actual'\n");
 		}
 #endif
 	}
@@ -2782,7 +2785,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_OperationModeAxis1);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Mode of operation display\n");
+			fprintf(stdout, "Failed to get reference to variable 'Mode of operation display'\n");
 		}
 #endif
 	}
@@ -2795,7 +2798,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_PrimaryTemperature);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Primary temperature\n");
+			fprintf(stdout, "Failed to get reference to variable 'Primary temperature value'\n");
 		}
 #endif
 	}
@@ -2808,7 +2811,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 2, (void **)&pucDio_MotorTemperature);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Motor temperature\n");
+			fprintf(stdout, "Failed to get reference to variable 'Motor temperature value'\n");
 		}
 #endif
 	}
@@ -2821,7 +2824,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_ModulePositionActual);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Motor temperature\n");
+			fprintf(stdout, "Failed to get reference to variable 'BiSS-C slave 1 / Primary SSI - Position'\n");
 		}
 #endif
 	}
@@ -2834,7 +2837,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_CurrentA);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Motor temperature\n");
+			fprintf(stdout, "Failed to get reference to variable 'Current A value'\n");
 		}
 #endif
 	}
@@ -2845,7 +2848,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_CurrentB);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Motor temperature\n");
+			fprintf(stdout, "Failed to get reference to variable 'Current B value'\n");
 		}
 #endif
 	}
@@ -2856,10 +2859,23 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_CurrentC);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Motor temperature\n");
+			fprintf(stdout, "Failed to get reference to variable 'Current C value'\n");
 		}
 #endif
 	}
+
+	result = ecmLookupVariable(hndMaster, "Bus voltage value", &VarDesc,
+			ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
+			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_BusVoltage);
+#ifdef _CONSOLE
+		if (result != ECM_SUCCESS) {
+			fprintf(stdout, "Failed to get reference to variable 'Bus voltage value'\n");
+		}
+#endif
+	}
+
 	
 	result = ecmLookupVariable(hndMaster, "Last error", &VarDesc,
 		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
@@ -2868,7 +2884,7 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 			VarDesc.ulBitOffs / 8, 4, (void **)&pucDio_LastError);
 #ifdef _CONSOLE
 		if (result != ECM_SUCCESS) {
-			fprintf(stdout, "Failed to get reference to variable Last Error\n");
+			fprintf(stdout, "Failed to get reference to variable 'Last error'\n");
 		}
 #endif
 	}	
@@ -2991,7 +3007,6 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 		}
 #endif
 	}
-
 
 	//------------------------------------
 	//-------Get Axis1 registers----------
@@ -3807,15 +3822,24 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 		PrintVarList(hndMaster);
 
 		/* Print copy vector */
+#ifdef _CONSOLE
 		PrintCopyVector(hndMaster);//EF mod
-
+#endif
 		/* Print statistic information */
 		PrintStatistic(hndDevice, hndMaster);
 	}
-	/* Setup reference to variables before attaching the master */
-	ecmTestSetupProcesData(hndMaster);
+	//----------------------------------------------------------------------
+	// Setup reference to variables before attaching the master
+	// TODO : modify this function to work with more than one slave in chain
+	//----------------------------------------------------------------------
+	PLOG_INFO << "PD mapping starts";
+	ecmTestSetupProcesData(hndMaster);//PD mapping is done in this function
+	/*for (int n = 0; n > &pSlaveCount; n++) {
+		ecmTestSetupProcesData(hndMaster, PD[n]);//PD mapping is done in this function
+	}*/
 
-	/* Attach the master to the device */
+
+	// Attach the master to the device
 	result = ecmAttachMaster(hndMaster);
 	if (result != ECM_SUCCESS) {
 		PLOG_FATAL << "Attaching master failed with " << ecmResultToString(result);
@@ -4374,6 +4398,15 @@ void CecmW::GetCurrentsABC(double *cA, double *cB, double *cC) {
 	if (pucDio_CurrentC != NULL) {
 		ecmCpuToLe(&val, pucDio_CurrentC, (const uint8_t *)"\x04\x0");
 		*cC = (double)val;
+	}
+}
+
+float CecmW::GetBusVoltage(void) {
+	static float busVoltage;
+
+	if (pucDio_BusVoltage != NULL) {
+		ecmCpuToLe(&busVoltage, pucDio_BusVoltage, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
+		return(busVoltage);
 	}
 }
 

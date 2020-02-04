@@ -76,7 +76,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						ShowParameter(int id);
 
 		//////////////////////////////////////////////////////////////////////////////////
-		//						DEVICE DATA		(aka PARAMETERS)						//
+		//						DEVICE DATA		(aka DEVICE PARAMETERS)						//
 		//////////////////////////////////////////////////////////////////////////////////
 
 		//Definitions
@@ -89,23 +89,24 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		#define						DEV_PARAMS		20	//Device TOTAL Parameters
 		#define						DEV_IND			8	//Device Individual Parameters	- exclusive for each drive/motor
-		#define						DEV_NONE		0								//None????????		
-		#define						DEV_POS			1	//Module Position
-		#define						DEV_VEL			2	//Module Velocity
-		#define						DEV_ACC			3	//Module Acceleration
-		#define						DEV_MPOS		4	//Motor Position
-		#define						DEV_MVEL		5	//Motor Velocity
-		#define						DEV_MACC		6	//Motor Acceleration
-		#define						DEV_AMP			7								//Module Amplitude???????
+		#define						DEV_NONE		0	//None???		
+		#define						DEV_POS			1	//Module Position [absolute encoder counts?]
+		#define						DEV_VEL			2	//Module Velocity [rev/s?]
+		#define						DEV_ACC			3	//Module Acceleration [rev/s^2?]
+		#define						DEV_MPOS		4	//Motor Position [relative encoder counts]
+		#define						DEV_MVEL		5	//Motor Velocity [rev/s]
+		#define						DEV_MACC		6	//Motor Acceleration [rev/s^2]
+		#define						DEV_AMP			7	//Module Amplitude???????
 				//Extra
-		#define						DEV_CUR			8								//Device Module Current?
-		#define						DEV_MTEMP		9	//Motor Temperature	
-		#define						DEV_TEMP		10	//Drive Temperature
+		#define						DEV_CUR			8	//Device Module Current?
+		#define						DEV_MTEMP		9	//Motor Temperature	[ºC]
+		#define						DEV_TEMP		10	//Drive Temperature [ºC]
 		#define						DEV_STATUS		15	//Drive Status word
 		#define						DEV_CURA		16	//Motor Current phase-A [A]
 		#define						DEV_CURB		17	//Motor Current phase-B [A]
 		#define						DEV_CURC		18	//Motor Current phase-C [A]
-		#define						DEV_CURERR		19								//Current Error?????
+		#define						DEV_BUS_V		19	//Bus voltage [V]	
+		#define						DEV_CURERR		19	//Current Error?????
 
 		//EXECUTE MOTION (TYPES)
 		#define						DEV_M_STOP		0

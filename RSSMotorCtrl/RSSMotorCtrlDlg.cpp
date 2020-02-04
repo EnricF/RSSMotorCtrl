@@ -413,25 +413,32 @@ void CRSSMotorCtrlDlg::ShowParameter(int id)
 		}
 		else
 		{
-			//Drive Temperature (internal)
+			//Drive Temperature (internal) [ºC]
 			if ( id == DEV_TEMP ) {//No TARGET value --> TODO : modify ID_EDIT name, just like above
 				szInfo.Format("%.1f", dDevData[DEV_TEMP][DEV_ACT]);	SetDlgItemText(IDC_EDIT_PARAM_T_ACT, szInfo);
 				szInfo.Format("%.1f", dDevData[DEV_TEMP][DEV_MIN]);	SetDlgItemText(IDC_EDIT_PARAM_T_MIN, szInfo);
 				szInfo.Format("%.1f", dDevData[DEV_TEMP][DEV_MAX]);	SetDlgItemText(IDC_EDIT_PARAM_T_MAX, szInfo);
 			}
 
-			//Motor Temperature
-			if ( id == DEV_MTEMP ) {//No TARGET value --> TODO : modify ID_EDIT name, just like above
+			//Motor Temperature [ºC]
+			else if ( id == DEV_MTEMP ) {//No TARGET value --> TODO : modify ID_EDIT name, just like above
 				szInfo.Format("%.1f", dDevData[DEV_MTEMP][DEV_ACT]);	SetDlgItemText(IDC_EDIT_PARAM_TM_ACT, szInfo);
 				szInfo.Format("%.1f", dDevData[DEV_MTEMP][DEV_MIN]);	SetDlgItemText(IDC_EDIT_PARAM_TM_MIN, szInfo);
 				szInfo.Format("%.1f", dDevData[DEV_MTEMP][DEV_MAX]);	SetDlgItemText(IDC_EDIT_PARAM_TM_MAX, szInfo);
 			}
 
-			//Current
-			if ( id == DEV_CURA || id == DEV_CURB  || id == DEV_CURC ) {//Current - NO TARGET VALUE YET!
+			//Current [A]
+			else if ( id == DEV_CURA || id == DEV_CURB  || id == DEV_CURC ) {//Current - NO TARGET VALUE YET!
 				szInfo.Format("%.3f", dDevData[id][DEV_ACT]);		SetDlgItemText(IDC_EPA16 + id - 16, szInfo);
 				szInfo.Format("%.3f", dDevData[id][DEV_MIN]);		SetDlgItemText(IDC_EPMIN16 + id - 16, szInfo);
 				szInfo.Format("%.3f", dDevData[id][DEV_MAX]);		SetDlgItemText(IDC_EPMAX16 + id - 16, szInfo);
+			}
+
+			//Bus voltage [V]
+			else if (id == DEV_BUS_V) {
+				szInfo.Format("%.2f", dDevData[id][DEV_ACT]);		SetDlgItemText(IDC_EDIT_PARAM_BUS_V_ACT, szInfo);
+				szInfo.Format("%.2f", dDevData[id][DEV_MIN]);		SetDlgItemText(IDC_EDIT_PARAM_BUS_V_MIN, szInfo);
+				szInfo.Format("%.2f", dDevData[id][DEV_MAX]);		SetDlgItemText(IDC_EDIT_PARAM_BUS_V_MAX, szInfo);
 			}
 		}
 	}
@@ -508,7 +515,8 @@ void CRSSMotorCtrlDlg::InitDevData()
 	//Current C
 	dDevData[DEV_CURC][DEV_ACT] = 0;	dDevData[DEV_CURC][DEV_TARGET] = 0;		dDevData[DEV_CURC][DEV_MIN] = -1;	dDevData[DEV_CURC][DEV_MAX] = -1;	dDevData[DEV_CURC][DEV_RANGE] = 1024.f;
 
-	//Current Error
+	//Current Error???
+	//or Bus Voltage
 	dDevData[DEV_CURERR][DEV_ACT] = 0;	dDevData[DEV_CURERR][DEV_TARGET] = 0;	dDevData[DEV_CURERR][DEV_MIN] = -1;	dDevData[DEV_CURERR][DEV_MAX] = -1;	dDevData[DEV_CURERR][DEV_RANGE] = 50.f;
 
 	//Init control variables
@@ -932,6 +940,8 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 			//Temperatures
 		motorParameters[BETH_PARAM_AR_ACT_TEMP]		= (double)cecmW.GetTemperaturePrimary();
 		motorParameters[BETH_PARAM_AR_ACT_FTEMP]	= (double)cecmW.GetTemperatureMotor();
+			//Bus Voltage
+		motorParameters[BETH_PARAM_AW_BUSV]			= (double)cecmW.GetBusVoltage();
 		
 		//Module
 		//Target Values
@@ -967,6 +977,9 @@ void CRSSMotorCtrlDlg::UpdateInterfaceControls()
 	ShowParameter(DEV_CURA);
 	ShowParameter(DEV_CURB);
 	ShowParameter(DEV_CURC);
+	//Bus voltage
+	ShowParameter(DEV_BUS_V);
+
 
 	//TODO : Update STATUS + STATUS_SEMAPHORE + LASTERROR here!
 }
@@ -1013,6 +1026,9 @@ void CRSSMotorCtrlDlg::UpdateInterfaceParameters()
 		UpdateValue(DEV_CURA,	motorParameters[BETH_PARAM_AW_CURA]);	//Current-A
 		UpdateValue(DEV_CURB,	motorParameters[BETH_PARAM_AW_CURB]);	//Current-B
 		UpdateValue(DEV_CURC,	motorParameters[BETH_PARAM_AW_CURC]);	//Current-C
+
+	//Actual Bus voltage
+		UpdateValue(DEV_BUS_V,	motorParameters[BETH_PARAM_AW_BUSV]);	//Bus Voltage
 	}
 
 }
