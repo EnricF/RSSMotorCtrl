@@ -236,7 +236,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		//Estabilització de la temperatura: Temperatures en 1 hora (3600s)
 		#define						STABLE_TEMPS 11
-		#define						STABLE_TIME	360
+		#define						STABLE_TIME				360
+		#define						STABLE_TIME_PERIOD_S	3/*600*////Temperature stabilization period
+
 		double						dTBuffer[STABLE_TEMPS][STABLE_TIME];
 		double						dTInc[STABLE_TEMPS];
 		int							iTIdx;
@@ -428,4 +430,20 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		*/
 		afx_msg void OnBnClickedButtonRecT();
 		afx_msg void OnBnClickedButtonDevBrake();
+
+		/*
+		* Temperature record file header openning/closing and header rows writing
+		*/
+
+		// Control for 'Thermal Analysis' CheckBox selection
+		CButton cbThermalAnalysis;
+		// To know if CheckBox is selected or not
+		BOOL cbThermalAnalysisBool;
+		afx_msg void OnBnClickedCheckThermalanalysis();
+		//int ThermalAnalysisMaxDuration_sec;		//default: 5 hours máx [seconds]
+		int64_t ThermalAnalysisTimeStart;	//TTAG start Thermal analysis[seconds]
+		int64_t ThermalAnalysisTimeNow;		//TTAG now Thermal analysis[seconds]
+		int64_t ThermalAnalysisTimePrev;	//TTAG of previous Temperature recording [seconds]
+		int64_t ThermalAnalysisFreq;		//Frequency (clock) value for Thermal analysis [Hz?]
+		void CheckThermalAnalysis(void);
 };

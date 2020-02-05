@@ -2738,6 +2738,34 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 #endif
     }	
 
+
+	//TODO : validated new mode of operation
+
+	/*Sets in a PDmapP structure all pointers of all slaves related to PD
+	* By now, all slaves share the same PD structure (RX/TX), and their order is fixed
+	*/
+	//SetPDmapP(hndMaster, ".DevState", &VarDesc);
+
+//BITRACK ETHERCAT SLAVES ID's
+#define BP1_M1	0	//Robotic Arm #1, Motor #1. First slave connected to Master ETH0
+#define BP1_M2	1	//Robotic Arm #1, Motor #2
+#define BP1_M3	2	//Robotic Arm #1, Motor #3
+#define BP1_M4	3	//Robotic Arm #1, Motor #4
+#define BP2_M1	4	//Robotic Arm #2, Motor #1. Connected to BP1_M4
+#define BP2_M2	5	//Robotic Arm #2, Motor #2
+#define BP2_M3	6	//Robotic Arm #2, Motor #3
+#define BP2_M4	7	//Robotic Arm #2, Motor #4
+#define BP3_M1	8	//Robotic Arm #3, Motor #1. Connected to BP2_M4
+#define BP3_M2	9	//Robotic Arm #3, Motor #2
+#define BP3_M3	10	//Robotic Arm #3, Motor #3
+#define BP3_M4	11	//Robotic Arm #3, Motor #4
+#define BL1_M4	12	//Laparoscopic Arm #1, Motor #1
+#define BL1_M4	13	//Laparoscopic Arm #1, Motor #2
+#define BL1_M4	14	//Laparoscopic Arm #1, Motor #3
+#define BL1_M4	15	//Laparoscopic Arm #1, Motor #4. Last slave connected to Master ETH0, connected directly to Master ETH1 (redundancy)
+	//	TODO : GETTERS and SETTERS must receive SLAVE ID as a parameter.
+	//	TODO : (In GUI) User must select SLAVE ID (Combo Box?). Default value is always 0 (first slave connected to ETHERCAT MASTER).
+
 	//Get Status Word (CiA)
 	result = ecmLookupVariable(hndMaster, "Statusword", &VarDesc,
 		ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
@@ -4408,6 +4436,8 @@ float CecmW::GetBusVoltage(void) {
 		ecmCpuToLe(&busVoltage, pucDio_BusVoltage, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
 		return(busVoltage);
 	}
+	else
+		return 0;
 }
 
 int CecmW::GetLastError(void) {

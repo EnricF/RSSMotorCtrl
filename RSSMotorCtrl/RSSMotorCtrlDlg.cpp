@@ -21,7 +21,34 @@
 #endif
 
 //------------------------------------
-// CAboutDlg dialog used for App About
+// CThermalAnalysisDlg dialog used for Dialog 'Thermal Analysis Info'
+//------------------------------------
+class CThermalAnalysisDlg : public CDialogEx {
+public:
+	enum { IDD = IDD_THERMALANALYSIS_DIALOG	};
+
+	CThermalAnalysisDlg();
+	//void CThermalAnalysisDlg::setText();
+
+protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+};
+
+CThermalAnalysisDlg::CThermalAnalysisDlg() :CDialogEx(IDD){
+
+	CStatic* myStatic = new CStatic;
+	myStatic->Create(_T("my static"), WS_CHILD | WS_VISIBLE | SS_CENTER,
+		CRect(10, 10, 150, 50), this, 1201);// writing "this" doesn't make it work.
+	//How to solve this?
+}
+
+void CThermalAnalysisDlg::DoDataExchange(CDataExchange* pDX){
+	CDialogEx::DoDataExchange(pDX);
+}
+
+
+//------------------------------------
+// CAboutDlg dialog used for Dialog 'About'
 //------------------------------------
 class CAboutDlg : public CDialogEx
 {
@@ -59,6 +86,7 @@ END_MESSAGE_MAP()
 
 CRSSMotorCtrlDlg::CRSSMotorCtrlDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_RSSMOTORCTRL_DIALOG, pParent)
+	, cbThermalAnalysisBool(FALSE)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -69,6 +97,8 @@ void CRSSMotorCtrlDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_SLIDER_VEL_VEL, scVelocity);
 	DDX_Control(pDX, IDC_SLIDER_VEL_ACC, scAcceleration);
 	DDX_Control(pDX, IDC_COMBO_RAMP_UP_UNITS, cmbRampUpUnitsSel);
+	DDX_Control(pDX, IDC_CHECK_THERMALANALYSIS, cbThermalAnalysis);
+	DDX_Check(pDX, IDC_CHECK_THERMALANALYSIS, cbThermalAnalysisBool);
 }
 
 BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
@@ -88,6 +118,7 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_BN_CLICKED(IDCANCEL, &CRSSMotorCtrlDlg::OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON_REC_T, &CRSSMotorCtrlDlg::OnBnClickedButtonRecT)
 	ON_BN_CLICKED(IDC_BUTTON_DEV_BRAKE, &CRSSMotorCtrlDlg::OnBnClickedButtonDevBrake)
+	ON_BN_CLICKED(IDC_CHECK_THERMALANALYSIS, &CRSSMotorCtrlDlg::OnBnClickedCheckThermalanalysis)
 END_MESSAGE_MAP()
 
 //EF mod
@@ -170,7 +201,7 @@ UINT ThreadWorker(LPVOID pParam)
 		QueryPerformanceCounter((LARGE_INTEGER*)&initial);
 		
 		////////////////////////////////////////
-		// COMMANDS - Does nothing by now (To be upgraded)
+		// COMMANDS - Checks if "Thermal Analysis" check box is selected or not (more things to be done someday)
 		pObject->ExecuteCommands();
 
 		////////////////////////////////////////
@@ -856,7 +887,107 @@ void CRSSMotorCtrlDlg::ExecuteCommands()
 
 	//Set Gear Ratio
 	SetGearRatio();
+
+	//Check - Thermal Analysis
+	if(cbThermalAnalysisBool)
+		CheckThermalAnalysis();
 }
+
+
+void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
+
+	static int elapsedTime_seconds;			//Total time lapse
+	static int elapsedTimePrev_seconds;		//elapsedTime_seconds Previous value
+	static int elapsedTimeStable_seconds;	//Time lapse in stable temperature condition
+
+	static float temperature_prev = 0.0;
+	static float temperature_now;
+
+	//static bool stableTemperature = false;//To know if stable temperature is found (so proccess ends!)
+	static bool timePrevIsUpdated = false;//To know if a temperature sample in stable range is found
+	
+	CString szText;//To show messages in Thermal Analysis Dialog
+
+	if(temperature_prev == 0.0)//Set INITIAL value
+		temperature_prev = motorParameters[BETH_PARAM_AR_ACT_FTEMP];
+
+	QueryPerformanceCounter((LARGE_INTEGER*)&ThermalAnalysisTimeNow);
+	elapsedTime_seconds = (int)((ThermalAnalysisTimeNow - ThermalAnalysisTimeStart) / ThermalAnalysisFreq);
+	if (elapsedTimePrev_seconds == 0.0)//Set INITIAL value
+		elapsedTimePrev_seconds = elapsedTime_seconds;
+
+	if ( elapsedTime_seconds < (STABLE_TIME_PERIOD_S * 5) ) {//MAX. ANALYSIS PERIOD
+
+		if ( (elapsedTime_seconds - elapsedTimePrev_seconds) > 1) {//checks every second approx.
+			temperature_now = motorParameters[BETH_PARAM_AR_ACT_FTEMP];
+			if (fabs(temperature_now - temperature_prev) > 1.0) {//1 [ºC] difference is the stabilization condition (DR)
+				//Not stable yet
+				timePrevIsUpdated = false;//Any time this happens, the process "restarts"
+			}
+			else {//NEW TEMPERATURE SAMPLE IS IN STABLE RANGE!
+				if (!timePrevIsUpdated) {//This is an initial candidate, so keep its timetag
+					QueryPerformanceCounter((LARGE_INTEGER*)&ThermalAnalysisTimePrev);//timetag of first sample in stable range
+					timePrevIsUpdated = true;
+				}
+				else {
+					elapsedTimeStable_seconds = (int)((ThermalAnalysisTimeNow - ThermalAnalysisTimePrev) / ThermalAnalysisFreq);
+					if (elapsedTimeStable_seconds > STABLE_TIME_PERIOD_S) {//1 hour
+						//END: TEMPERATURE IS STABILIZED!!
+						PLOGI << "'Thermal Analysis' FINISHED SUCCESSFULLY";
+
+						GetDlgItemText(IDC_TA_STATIC, szText);
+
+						//Show Thermal Analysis Dialog
+						szText.Format("Thermal Analysis endeed succesfully after %d seconds", elapsedTime_seconds);
+						SetDlgItemText(IDC_TA_STATIC, szText);
+						CThermalAnalysisDlg().DoModal();
+
+						//STOP recording
+						if (recCurData) {
+							recCurData = false;
+							curDataFile.Close();
+						}
+						//CLOSE SW
+						FinalizeControlThreads();						
+					}					
+				}
+
+			}
+		}
+	}
+	else {//TEST TIMEOUT - END THERMAL ANALYSIS
+		//CLOSE SW AND EXIT!
+		PLOGI << "'Thermal Analysis' timeout: Temperature stabilization is not reached after 5 hours. CLOSING SW!";
+
+		//Show Thermal Analysis Dialog
+		szText.Format("Thermal Analysis failed - TIMEOUT after %d seconds", STABLE_TIME_PERIOD_S * 5);
+		SetDlgItemText(IDC_TA_STATIC, szText);
+		CThermalAnalysisDlg().DoModal();
+
+		// TODO : Show a dialog notifying to the user that Thermal Analysis process TIMEOUT is reached, so temperature is not stable yet
+	}
+
+
+
+	/*
+	GetSystemTime(tnow);		//TTAG now Thermal analysis[seconds]
+	
+	//ThermalAnalysisTimeNow->wHour();
+
+	static LPFILETIME lpSystemTimeAsFileTime;
+	lpSystemTimeAsFileTime->dwHighDateTime = 0;
+	lpSystemTimeAsFileTime->dwLowDateTime = 0;
+	GetSystemTimeAsFileTime(lpSystemTimeAsFileTime);
+
+	DWORD test;
+	test = lpSystemTimeAsFileTime->dwLowDateTime;
+
+	*/
+
+
+	
+}
+
 
 void CRSSMotorCtrlDlg::ExecuteMotion()
 {
@@ -923,28 +1054,24 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 		LastError = cecmW.GetLastError();//CiA register
 		SetDlgItemInt(IDC_EDIT_DEV_LASTERROR, LastError);//temporally done here, to be moved out!
 
-		//Actual Values
+		////////////Actual Values
 			//Motor (inner)
 		motorParameters[BETH_PARAM_AR_ACTPOS]		= (double)cecmW.GetActPos();
 		motorParameters[BETH_PARAM_AR_ACTVEL]		= (double)cecmW.GetActVel();
-		motorParameters[BETH_PARAM_AR_ACTACC]		= fLoopMaxAcc;//simplification
+		motorParameters[BETH_PARAM_AR_ACTACC]		= 0.0;//simplification
 			//Module (outter)
 		motorParameters[BETH_PARAM_AR_ACTMODULEPOS] = (double)cecmW.GetModuleActPos();
 		motorParameters[BETH_PARAM_AR_ACTMODULEVEL] = (double)cecmW.GetActVel() * 1000 / (gearFactor * ENC_MOTOR_DR);// = (double)cecmW.GetModuleActVel();	//TBD
 		motorParameters[BETH_PARAM_AR_ACTMODULEACC] = 0.0;// = (double)cecmW.GetModuleActACC();	//TBD
 			//Currents
 		cecmW.GetCurrentsABC(&motorParameters[BETH_PARAM_AW_CURA], &motorParameters[BETH_PARAM_AW_CURB], &motorParameters[BETH_PARAM_AW_CURC]);
-		//motorParameters[BETH_PARAM_AW_CURA]			= 0.0;// = (double)cecmW.GetCurrent("A");	//TBD
-		//motorParameters[BETH_PARAM_AW_CURB]			= 0.0;// = (double)cecmW.GetCurrent("A");	//TBD
-		//motorParameters[BETH_PARAM_AW_CURC]			= 0.0;// = (double)cecmW.GetCurrent("A");	//TBD
 			//Temperatures
 		motorParameters[BETH_PARAM_AR_ACT_TEMP]		= (double)cecmW.GetTemperaturePrimary();
 		motorParameters[BETH_PARAM_AR_ACT_FTEMP]	= (double)cecmW.GetTemperatureMotor();
 			//Bus Voltage
 		motorParameters[BETH_PARAM_AW_BUSV]			= (double)cecmW.GetBusVoltage();
 		
-		//Module
-		//Target Values
+		////////////Target Values
 			//Motor (inner)
 		motorParameters[BETH_PARAM_AW_TARGET_POS]		= (double)iLoopPos;	//simplification
 		motorParameters[BETH_PARAM_AW_TARGET_VEL]		= velTargetVel;		//
@@ -1691,7 +1818,7 @@ void CRSSMotorCtrlDlg::RecordDeviceData()
 	int timestamp = (int)((recCurATime - recCurITime)*1000.0 / freq);
 
 
-	CString szLine; szLine.Format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n",
+	CString szLine; szLine.Format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n",
 
 		recCurSample,								//Current sample	
 		//Motor
@@ -1711,9 +1838,11 @@ void CRSSMotorCtrlDlg::RecordDeviceData()
 		//Currents
 		motorParameters[BETH_PARAM_AW_CURA],					
 		motorParameters[BETH_PARAM_AW_CURB],						
-		motorParameters[BETH_PARAM_AW_CURC],				
+		motorParameters[BETH_PARAM_AW_CURC],
+		//Bus voltage
+		motorParameters[BETH_PARAM_AW_BUSV],
 
-		timestamp);									//Time stamp
+		timestamp);//Time stamp [ms]
 	//Write Data register
 	curDataFile.Write(szLine.GetBuffer(), szLine.GetLength());
 
@@ -1789,4 +1918,24 @@ void CRSSMotorCtrlDlg::OnBnClickedCancel()
 
 	//Old
 	CDialogEx::OnCancel();
+}
+
+
+void CRSSMotorCtrlDlg::OnBnClickedCheckThermalanalysis()
+{
+	// TODO: Add your control notification handler code here
+	PLOGI << "Click on 'Thermal Analysis' check box";
+
+	cbThermalAnalysisBool = !cbThermalAnalysisBool;//Update value (default/start is disabled!)
+
+	if (cbThermalAnalysisBool) {
+		PLOGI << "'Thermal Analysis' enabled";
+		//ThermalAnalysisMaxDuration_sec		= 5 * 3600;	//5 hours máx
+
+		QueryPerformanceCounter((LARGE_INTEGER*)&ThermalAnalysisTimeStart);
+		QueryPerformanceFrequency((LARGE_INTEGER*)&ThermalAnalysisFreq);
+	}
+	else {
+		PLOGI << "'Thermal Analysis' disabled";
+	}
 }

@@ -6,6 +6,7 @@
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101
 #define IDD_RSSMOTORCTRL_DIALOG         102
+#define IDD_THERMALANALYSIS_DIALOG      103
 #define IDR_MAINFRAME                   128
 #define IDB_BITMAP1                     134
 #define IDB_BITMAP_STATUSEMAPHORE_YELLOW 135
@@ -116,7 +117,10 @@
 #define IDC_BUTTON_DEV_FAULT_RESET      1103
 #define IDC_STATIC_TEMP_SHOWDATA        1104
 #define IDC_STATIC_PARAM_MAX            1105
+#define IDC_IPADDRESS1                  1105
 #define IDC_BUTTON_DEV_BRAKE            1106
+#define IDC_CHECK_THERMALANALYSIS       1107
+#define IDC_TA_STATIC                   1108
 #define IDC_EPA16                       1110
 #define IDC_EPA17                       1111
 #define IDC_EPA18                       1112
@@ -131,9 +135,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        137
+#define _APS_NEXT_RESOURCE_VALUE        142
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1085
+#define _APS_NEXT_CONTROL_VALUE         1106
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
