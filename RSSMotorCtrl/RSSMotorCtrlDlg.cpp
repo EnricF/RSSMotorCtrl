@@ -161,14 +161,13 @@ UINT ThreadECMWorker(LPVOID pParam) {
 
 	pObject->bThreadECMWActive = true;
 
-	//Init ECM and loop until end
-	pObject->cecmW.Init(__argc, __argv, &pObject->bThreadWActive);//Receives main WORKER thread status (active TRUE or FALSE)
-			
-	//WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for Worker thread to finish	
-
 	//Control bucle
 	while (pObject->bThreadECMWActive)
 	{
+		//Init ECM and loop until end
+		pObject->cecmW.Init(__argc, __argv, &pObject->bThreadWActive);//Receives main WORKER thread status (active TRUE or FALSE)
+		//WaitForSingleObject(pObject->tWorker, INFINITE);//Waits for Worker thread to finish	
+		
 		//Initialize time counters
 		QueryPerformanceCounter((LARGE_INTEGER*)&final);
 
@@ -177,6 +176,8 @@ UINT ThreadECMWorker(LPVOID pParam) {
 
 		//More?
 		Sleep(1000);
+
+		//Reconnect (loop)
 	}
 
 	//Finish Thread
@@ -564,34 +565,10 @@ void CRSSMotorCtrlDlg::InitDevData()
 	bBrakeMotor		= false;
 	bBrakeState		= false;
 	bWriteEEPROM	= false;
-
-	bMotorAddTemps = false;
-	//bCalibPosition = false;
 	
 	//Status Variables
 	bMotorHalted = false;
 	
-	//Init temperatures stabilization data
-	for (int i = 0; i < STABLE_TEMPS; i++)
-	{
-		for (int j = 0; j < STABLE_TIME; j++)
-			dTBuffer[i][j] = 0.0;
-
-		dTInc[i] = 0.0;
-	}
-
-	iTIdx = 0;
-	dMaxIncTemp = 0;
-	dAmbIncTemp = 0;
-
-	motorAddTemps[0] = 0.0;
-	motorAddTemps[1] = 0.0;
-	motorAddTemps[2] = 0.0;
-	motorAddTemps[3] = 0.0;
-	motorAddTemps[4] = 0.0;
-	motorAddTemps[5] = 0.0;
-	motorAddTemps[6] = 0.0;
-
 	//Setting motor specification parameters
 	motorParameters[BETH_PARAM_DR_HOMEOFFSET]	= 0.;	// TODO : defined by USER in run-time?
 	motorParameters[BETH_PARAM_DR_GEARRATIO]	= 1200.;
@@ -877,8 +854,7 @@ void CRSSMotorCtrlDlg::GetDefaultDeviceParameters()
 	//TODO set default device parameters
 }
 
-void CRSSMotorCtrlDlg::ExecuteCommands()
-{
+void CRSSMotorCtrlDlg::ExecuteCommands(){
 	//Set Module Zero Offset
 	//SetModuleZero();
 
@@ -895,6 +871,122 @@ void CRSSMotorCtrlDlg::ExecuteCommands()
 
 
 void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
+
+	static int elapsedTimeTotal_seconds;	//Total time lapse
+	static int prevTempUpdate_seconds;		//Previous Temperature update value update timetag
+	static int maxDuration = STABLE_TIME_PERIOD_S * 5;
+
+	static bool timePrevIsUpdated = false;//To know if a temperature sample in stable range is found
+
+	CString szText;//To show messages in Thermal Analysis Dialog
+
+	//static std::vector<float>	temperatures[(int)STABLE_TIME_PERIOD_S];
+	static std::vector<float>	temperatures;
+	static std::vector<float>::iterator it;//write
+	static std::vector<float>::iterator itr;//read
+	static int					samplesMax	= (int)STABLE_TIME_PERIOD_S;
+	static int					samplesQ	= 0;//samples in vector
+	static double sum		= 0.;//The sumatory of all temperature values
+	static double mean		= 0.;//The mean temperature value
+	static double sum_pot2	= 0.;//The square difference between a temperature sample and the mean temperature
+	static double variance	= 0.;
+	static double typ_dev	= 0.;
+	static bool	  isReady	= false;
+	   
+	//initial values
+	if (!isReady && (motorParameters[BETH_PARAM_AR_ACT_FTEMP] != 0.0) ) {//Set INITIAL value
+		//temperature_prev	= (float)motorParameters[BETH_PARAM_AR_ACT_FTEMP];
+		temperatures.resize(STABLE_TIME_PERIOD_S);
+		//temperatures.push_back( (float)motorParameters[BETH_PARAM_AR_ACT_FTEMP] );//[0]
+		it = temperatures.end();
+		isReady = true;
+	}
+	QueryPerformanceCounter((LARGE_INTEGER*)&ThermalAnalysisTimeNow);
+	elapsedTimeTotal_seconds = (int)((ThermalAnalysisTimeNow - ThermalAnalysisTimeStart) / ThermalAnalysisFreq);
+	if (prevTempUpdate_seconds == 0.0)//Set INITIAL value
+		prevTempUpdate_seconds = elapsedTimeTotal_seconds;
+
+	//Main algorithm
+	if ( (elapsedTimeTotal_seconds < maxDuration) && isReady ) {//MAX. ANALYSIS PERIOD
+
+		if ( (elapsedTimeTotal_seconds - prevTempUpdate_seconds) >= 1 ) {//checks every second approx.
+
+			prevTempUpdate_seconds = elapsedTimeTotal_seconds;//Update prev Temperature value update timetag
+
+			if (it == temperatures.end())//overflow?????
+				it = temperatures.begin();
+			else
+				it++;
+
+			//Update mean only if vector is already FULL of real samples
+			if ( samplesQ == STABLE_TIME_PERIOD_S ) {
+				sum -= (double)*it;//substract oldest sample value
+				sum += motorParameters[BETH_PARAM_AR_ACT_FTEMP];//add newest sample value
+				mean = sum / samplesMax;//update mean value
+			}
+			else {//Add temperature to sum - keep filling vector until it's full
+				sum += (double)motorParameters[BETH_PARAM_AR_ACT_FTEMP];
+				//Increase real samples quantity in temperature vector
+				samplesQ++;
+				if(samplesQ == STABLE_TIME_PERIOD_S)
+					mean = sum / samplesMax;//First mean value
+			}
+
+			//Insert/Update temperatures vector
+			*it = (float)motorParameters[BETH_PARAM_AR_ACT_FTEMP];//Add new sample
+			
+			//Check if temperature is already stabilized or not
+			//But only if elapsed time is more than one hour and the temperature vector is full
+			if ( (elapsedTimeTotal_seconds >= STABLE_TIME_PERIOD_S) && (samplesQ == STABLE_TIME_PERIOD_S) ) {
+								
+				//Iterate through each sample
+				for (itr = temperatures.begin(); itr < temperatures.end(); itr++) {
+					double base = *itr - mean;
+					static double exp = 2.0;
+					sum_pot2 += pow(base, exp);// element_diff^2
+				}
+
+				//Divide by total samples
+				variance = sum_pot2 / (double)STABLE_TIME_PERIOD_S;//[ºC^2]
+				//Calculate typical deviation
+				typ_dev = sqrt(variance);//[ºC]
+
+				if (typ_dev < TEMPERATURE_TYP_DEV) {
+					//END: TEMPERATURE IS STABILIZED!!
+					PLOGI << "'Thermal Analysis' FINISHED SUCCESSFULLY after " << elapsedTimeTotal_seconds <<
+						" seconds with sigma = "	<< typ_dev << " [s]";
+
+					GetDlgItemText(IDC_TA_STATIC, szText);
+
+					//Show Thermal Analysis Dialog
+					CThermalAnalysisDlg().DoModal();
+					// TODO : Modify Text in Thermal Analysis Dialog
+
+					//STOP recording
+					if (recCurData) {
+						recCurData = false;
+						curDataFile.Close();
+					}
+					//CLOSE SW
+					FinalizeControlThreads();
+				}
+			}
+		
+		}
+	}
+	else {//TIMEOUT - END THERMAL ANALYSIS
+		//Close and exit!
+		PLOGI << "'Thermal Analysis' timeout: Temperature stabilization is not reached after " <<
+			maxDuration << " hours. CLOSING SW!";
+		CThermalAnalysisDlg().DoModal();
+		// TODO : Modify Text in Thermal Analysis Dialog
+	}
+}
+
+
+
+//old version
+/*void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 
 	static int elapsedTime_seconds;			//Total time lapse
 	static int elapsedTimePrev_seconds;		//elapsedTime_seconds Previous value
@@ -966,28 +1058,8 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 
 		// TODO : Show a dialog notifying to the user that Thermal Analysis process TIMEOUT is reached, so temperature is not stable yet
 	}
-
-
-
-	/*
-	GetSystemTime(tnow);		//TTAG now Thermal analysis[seconds]
-	
-	//ThermalAnalysisTimeNow->wHour();
-
-	static LPFILETIME lpSystemTimeAsFileTime;
-	lpSystemTimeAsFileTime->dwHighDateTime = 0;
-	lpSystemTimeAsFileTime->dwLowDateTime = 0;
-	GetSystemTimeAsFileTime(lpSystemTimeAsFileTime);
-
-	DWORD test;
-	test = lpSystemTimeAsFileTime->dwLowDateTime;
-
-	*/
-
-
-	
 }
-
+*/
 
 void CRSSMotorCtrlDlg::ExecuteMotion()
 {
@@ -1565,8 +1637,6 @@ void CRSSMotorCtrlDlg::InitRecordTemp()
 
 	//Update Interface Text
 	SetDlgItemText(IDC_BUTTON_REC_T, "Rec. ºC");//Default Start text
-
-	PLOGI << "Click on 'Device Record Temperature Initialize' button";
 }
 
 void CRSSMotorCtrlDlg::OnBnClickedButtonRecT()
@@ -1667,35 +1737,6 @@ void CRSSMotorCtrlDlg::RecordTemp()
 		dTBuffer[9][iTIdx] = motorAddTemps[5];
 		dTBuffer[10][iTIdx] = motorAddTemps[6];
 
-		//Update Indexes
-		iTIdx = (int)(elapsedTime / 10000);
-		iTIdx = iTIdx % STABLE_TIME;
-		int idxA = iTIdx % STABLE_TIME;
-		int idxB = (iTIdx + 1) % STABLE_TIME;
-		int firstHour = elapsedTime / 1000;
-
-		//Reset max inc temperature
-		dMaxIncTemp = 0;
-
-		//Calcule temperatura increment
-		for (int i = 0; i < STABLE_TEMPS; i++)
-		{
-			//First hour					
-			if (firstHour < 3600)
-			{
-				dTInc[i] = (dTBuffer[i][idxA] - dTBuffer[i][0])*STABLE_TIME / iTIdx;
-			}
-			else
-			{
-				dTInc[i] = dTBuffer[i][idxA] - dTBuffer[i][idxB];
-			}
-
-			//Calcule max inc temperature
-			if (dTInc[i] > dMaxIncTemp) dMaxIncTemp = dTInc[i];
-		}
-
-		//Max Internal Ambient Temperature
-		dAmbIncTemp = dTInc[5];		//Internat temperature
 
 		//Generate String
 		CString szAddTemp;
@@ -1801,8 +1842,6 @@ void CRSSMotorCtrlDlg::InitRecordDeviceData()
 
 	//Update Interface Text
 	SetDlgItemText(IDC_BUTTON_REC_DATA, "Rec. Data");
-
-	PLOGI << "Click on 'Device Record Data Initialize' button";
 }
 
 void CRSSMotorCtrlDlg::RecordDeviceData()

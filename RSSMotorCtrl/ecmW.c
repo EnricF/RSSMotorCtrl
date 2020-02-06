@@ -3558,25 +3558,53 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 				fprintf(ECMlogFile,"---------------------------\n");
 #endif
 			}
-			for (i = 0; i < (int)numAdapter; i++) {
-				if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
-					PLOG_INFO << "[" << i << "]" << pNicList[i].szName << " MAC: " <<
-						pNicList[i].macAddr.b[0] << pNicList[i].macAddr.b[1] <<
-						pNicList[i].macAddr.b[2] << pNicList[i].macAddr.b[3] <<
-						pNicList[i].macAddr.b[4] << pNicList[i].macAddr.b[5];
+
+
+			// EF mod
+			// MAC is hard-coded
+			// TODO : ComboBox selection/show of Primary/Redundant MAC addresses
+			//TwinCAT - Intel PCI Ethernet Adapter(Gigabit)		MAC: 00.01.05.4a.c7.e4
+			//TwinCAT - Intel PCI Ethernet Adapter(Gigabit) #2	MAC: 00.01.05.4a.c7.e5
+			if (iPrimaryNic == 0) {
+				PLOG_INFO << "Hard-code MAC selection: TwinCAT NIC";
+				i = 0;
+				pNicList[i].macAddr.b[0] = 0x00;
+				pNicList[i].macAddr.b[1] = 0x01;
+				pNicList[i].macAddr.b[2] = 0x05;
+				pNicList[i].macAddr.b[3] = 0x4a;
+				pNicList[i].macAddr.b[4] = 0xc7;
+				pNicList[i].macAddr.b[5] = 0xe4;
+				ECM_INIT_MAC(macPrimary, pNicList[i].macAddr);
+				pNicList[i+1].macAddr.b[0] = 0x00;
+				pNicList[i+1].macAddr.b[1] = 0x01;
+				pNicList[i+1].macAddr.b[2] = 0x05;
+				pNicList[i+1].macAddr.b[3] = 0x4a;
+				pNicList[i+1].macAddr.b[4] = 0xc7;
+				pNicList[i+1].macAddr.b[5] = 0xe5;
+				ECM_INIT_MAC(macRedundant, pNicList[i+1].macAddr);
+			}
+			else {//old code: default if i != 0
+			
+				for (i = 0; i < (int)numAdapter; i++) {
+					if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
+						PLOG_INFO << "[" << i << "]" << pNicList[i].szName << " MAC: " <<
+							pNicList[i].macAddr.b[0] << pNicList[i].macAddr.b[1] <<
+							pNicList[i].macAddr.b[2] << pNicList[i].macAddr.b[3] <<
+							pNicList[i].macAddr.b[4] << pNicList[i].macAddr.b[5];
 #ifdef _CONSOLE
-					fprintf(stdout,"%d. %s\n   MAC: %02x.%02x.%02x.%02x.%02x.%02x\n",
-						i, pNicList[i].szName,
-						pNicList[i].macAddr.b[0], pNicList[i].macAddr.b[1],
-						pNicList[i].macAddr.b[2], pNicList[i].macAddr.b[3],
-						pNicList[i].macAddr.b[4], pNicList[i].macAddr.b[5]);
+						fprintf(stdout, "%d. %s\n   MAC: %02x.%02x.%02x.%02x.%02x.%02x\n",
+							i, pNicList[i].szName,
+							pNicList[i].macAddr.b[0], pNicList[i].macAddr.b[1],
+							pNicList[i].macAddr.b[2], pNicList[i].macAddr.b[3],
+							pNicList[i].macAddr.b[4], pNicList[i].macAddr.b[5]);
 #endif
-				}
-				if (iPrimaryNic == i) {//TODO : select NIC by MAC and not as an execution argument
-					ECM_INIT_MAC(macPrimary, pNicList[i].macAddr);
-				}
-				if (iRedundantNic == i) {
-					ECM_INIT_MAC(macRedundant, pNicList[i].macAddr);
+					}
+					if (iPrimaryNic == i) {//TODO : select NIC by MAC and not as an execution argument
+						ECM_INIT_MAC(macPrimary, pNicList[i].macAddr);
+					}
+					if (iRedundantNic == i) {
+						ECM_INIT_MAC(macRedundant, pNicList[i].macAddr);
+					}
 				}
 			}
 			free(pNicList);
@@ -4024,56 +4052,61 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 		* Print device state and active slaves while running.
 		* Cyclic I/O data is handled in the callback handler
 		*/
+		uint8_t			linkLost = 0;	//New EXIT condition
+		ECM_SLAVE_DIAG	diag;		//To know about EtherCAT link status
 		for (i = 0; ; i++) {
-			uint16_t usData;
+			uint16_t	usData;
 
-			/* Check exit condition */
-			if ((g_lRuntime != 0) && i >= (int)g_lRuntime) {
+			// Check exit condition
+			if ( (g_lRuntime != 0) && i >= (int)g_lRuntime ) {
 				break;
-			}	
+			}
 
+			// If more than X linkLost
+			// If PD mapping is done
+			// Then EXIT (reconnect)
+			if ( (linkLost > 1) && (*pucDio_StatusWord != 0x00) ) {
+				PLOGE << "Link Lost counter: " << linkLost << " RECONNECTING!";
+				break;
+			}
+
+#ifdef _CONSOLE
 			/* Print device state (virtual variable) */
 			if (pDevState != NULL) {
 				ecmCpuToLe(&usData, pDevState, (const uint8_t *)"\x2\x0");
-#ifdef _CONSOLE
 				fprintf(stdout, "State: %04x", usData);
-#endif
 			}
-			/* Print # of slaves on primary and redundant adapter */
+
+			// Print # of slaves on primary and redundant adapter
 			if (pSlaveCount != NULL) {
 				ecmCpuToLe(&usData, pSlaveCount, (const uint8_t *)"\x2\x0");
-#ifdef _CONSOLE
 				fprintf(stdout, " / Pri: %d", usData);
-#endif
 				if (pSlaveCount2 != NULL) {
 					ecmCpuToLe(&usData, pSlaveCount2, (const uint8_t *)"\x2\x0");
-#ifdef _CONSOLE
 					fprintf(stdout, " / Red: %d", usData);
-#endif
 				}
 			}
 
-			/* Print WC state of 1st frame */
+			// Print WC state of 1st frame 
 			if (pWcState != NULL) {
 				ecmCpuToLe(&usData, pWcState, (const uint8_t *)"\x2\x0");
-#ifdef _CONSOLE
 				fprintf(stdout, " / Frm0WC: %04x", usData);
-#endif
 			}
-
+#endif
 			/* Request diagnostic data in round robin mode */
 			if ((ulConfigFlags & ECM_TEST_FLAG_SLAVE_STATUS) != 0) {
 				if (ecmGetSlaveHandle(hndSlave, &hndSlave) != ECM_SUCCESS) {
 					hndSlave = hndMaster;
 				}
 				else {
-					ECM_SLAVE_DIAG diag;
+					
 					diag.usControl = 0;
 					if (ECM_SUCCESS == ecmGetSlaveDiag(hndSlave, &diag)) {
-#ifdef _CONSOLE
 						fprintf(stdout, " Link lost (Slave %x): %d", diag.usAddr,
 							diag.counter.ucLostLinkErrorPort0);
-#endif
+						
+						//EF mod - Testing EXIT conditions
+						linkLost = diag.counter.ucLostLinkErrorPort0;
 					}
 				}
 			}
