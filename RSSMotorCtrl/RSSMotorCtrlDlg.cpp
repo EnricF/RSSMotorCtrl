@@ -178,6 +178,8 @@ UINT ThreadECMWorker(LPVOID pParam) {
 		Sleep(1000);
 
 		//Reconnect (loop)
+		if(pObject->bThreadECMWActive)
+			PLOGI << " ThreadECM thread might be restarted";
 	}
 
 	//Finish Thread
@@ -872,26 +874,30 @@ void CRSSMotorCtrlDlg::ExecuteCommands(){
 
 void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 
+	CString szText;//To show messages in Thermal Analysis Dialog
+
 	static int elapsedTimeTotal_seconds;	//Total time lapse
 	static int prevTempUpdate_seconds;		//Previous Temperature update value update timetag
 	static int maxDuration = STABLE_TIME_PERIOD_S * 5;
 
 	static bool timePrevIsUpdated = false;//To know if a temperature sample in stable range is found
-
-	CString szText;//To show messages in Thermal Analysis Dialog
-
-	//static std::vector<float>	temperatures[(int)STABLE_TIME_PERIOD_S];
+	
 	static std::vector<float>	temperatures;
 	static std::vector<float>::iterator it;//write
 	static std::vector<float>::iterator itr;//read
 	static int					samplesMax	= (int)STABLE_TIME_PERIOD_S;
 	static int					samplesQ	= 0;//samples in vector
-	static double sum		= 0.;//The sumatory of all temperature values
+	/*static double sum		= 0.;//The sumatory of all temperature values
 	static double mean		= 0.;//The mean temperature value
 	static double sum_pot2	= 0.;//The square difference between a temperature sample and the mean temperature
 	static double variance	= 0.;
-	static double typ_dev	= 0.;
+	static double typ_dev	= 0.;*/
 	static bool	  isReady	= false;
+	
+	//Temperature variables
+	float min_val;
+	float max_val;
+	float temperature_diff;
 	   
 	//initial values
 	if (!isReady && (motorParameters[BETH_PARAM_AR_ACT_FTEMP] != 0.0) ) {//Set INITIAL value
@@ -918,11 +924,14 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 			else
 				it++;
 
+			//Estandar deviation calcs (obsolete)
+/*
 			//Update mean only if vector is already FULL of real samples
 			if ( samplesQ == STABLE_TIME_PERIOD_S ) {
 				sum -= (double)*it;//substract oldest sample value
 				sum += motorParameters[BETH_PARAM_AR_ACT_FTEMP];//add newest sample value
 				mean = sum / samplesMax;//update mean value
+				
 			}
 			else {//Add temperature to sum - keep filling vector until it's full
 				sum += (double)motorParameters[BETH_PARAM_AR_ACT_FTEMP];
@@ -931,14 +940,32 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 				if(samplesQ == STABLE_TIME_PERIOD_S)
 					mean = sum / samplesMax;//First mean value
 			}
+			*/
 
 			//Insert/Update temperatures vector
 			*it = (float)motorParameters[BETH_PARAM_AR_ACT_FTEMP];//Add new sample
-			
+
+			//Increase real samples quantity in temperature vector
+			if (samplesQ < STABLE_TIME_PERIOD_S)	samplesQ++;
+
+			//Set out of real temperature range values to be updated easily with real temperature values
+			min_val = 1000.;
+			max_val = -100.;
+			//Update MIN or MAX values in temperature vector
+			for (itr = temperatures.begin(); itr < temperatures.end(); itr++) {
+				if (*itr < min_val)	min_val = *itr;
+				if (*itr > max_val)	max_val = *itr;
+			}
+			//Calculate (MAX - MIN) difference 
+			temperature_diff = max_val - min_val;
+
+
 			//Check if temperature is already stabilized or not
 			//But only if elapsed time is more than one hour and the temperature vector is full
 			if ( (elapsedTimeTotal_seconds >= STABLE_TIME_PERIOD_S) && (samplesQ == STABLE_TIME_PERIOD_S) ) {
-								
+				
+				//Estandar deviation calcs (obsolete)
+				/*
 				//Iterate through each sample
 				for (itr = temperatures.begin(); itr < temperatures.end(); itr++) {
 					double base = *itr - mean;
@@ -951,10 +978,11 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 				//Calculate typical deviation
 				typ_dev = sqrt(variance);//[ºC]
 
-				if (typ_dev < TEMPERATURE_TYP_DEV) {
+				if (typ_dev < TEMPERATURE_TYP_DEV) {*/
+				if (temperature_diff < TEMPERATURE_MAX_DIFF){
 					//END: TEMPERATURE IS STABILIZED!!
 					PLOGI << "'Thermal Analysis' FINISHED SUCCESSFULLY after " << elapsedTimeTotal_seconds <<
-						" seconds with sigma = "	<< typ_dev << " [s]";
+						" seconds with a max. temperature diff. of "	<< temperature_diff << " [ºC]";
 
 					GetDlgItemText(IDC_TA_STATIC, szText);
 
@@ -970,8 +998,7 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 					//CLOSE SW
 					FinalizeControlThreads();
 				}
-			}
-		
+			}		
 		}
 	}
 	else {//TIMEOUT - END THERMAL ANALYSIS
@@ -1684,14 +1711,8 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRecT()
 		fTempInfo.Write(szData.GetBuffer(), szData.GetLength());
 
 		//COLUMNS
-		if (bMotorAddTemps)
-		{
-			szData.Format("TimeId\tAmp\tCurrent\tT_FaseA\tT_FaseB\tT_FaseC\tT_Motor\tT_Fre\tT_Int\tT_Amb\tT_6011\tT_DAC\tT_Tapa\tT_5015\tTPC\r\n");
-		}
-		else
-		{
-			szData.Format("TimeId\tAmp\tT_FaseA\tT_FaseB\tT_FaseC\tT_Motor\tCurrent\tTPC\r\n");
-		}
+		szData.Format("TimeId\tAmp\tT_FaseA\tT_FaseB\tT_FaseC\tT_Motor\tCurrent\tTPC\r\n");
+
 
 		fTempInfo.Write(szData.GetBuffer(), szData.GetLength());
 
@@ -1725,7 +1746,7 @@ void CRSSMotorCtrlDlg::RecordTemp()
 		// TEMPERATURE STABILIZATION
 
 		//Update temperature data
-		dTBuffer[0][iTIdx] = dTemps[TEMP_T1];
+		/*dTBuffer[0][iTIdx] = dTemps[TEMP_T1];
 		dTBuffer[1][iTIdx] = dTemps[TEMP_T2];
 		dTBuffer[2][iTIdx] = dTemps[TEMP_T3];
 		dTBuffer[3][iTIdx] = dTemps[TEMP_M];
@@ -1736,11 +1757,11 @@ void CRSSMotorCtrlDlg::RecordTemp()
 		dTBuffer[8][iTIdx] = motorAddTemps[4];
 		dTBuffer[9][iTIdx] = motorAddTemps[5];
 		dTBuffer[10][iTIdx] = motorAddTemps[6];
-
+		*/
 
 		//Generate String
 		CString szAddTemp;
-		szAddTemp.Format("T1: %.1f  T2: %.1f  T3: %.1f  T4: %.1f  T5: %.1f \r\nT6: %.1f  T7: %.1f  T8: %.1f  T9: %.1f  T10: %.1f  TA: %.1f\r\nMaxInc: %.1f  AmbInc: %.1f  Seconds: %d",
+		/*szAddTemp.Format("T1: %.1f  T2: %.1f  T3: %.1f  T4: %.1f  T5: %.1f \r\nT6: %.1f  T7: %.1f  T8: %.1f  T9: %.1f  T10: %.1f  TA: %.1f\r\nMaxInc: %.1f  AmbInc: %.1f  Seconds: %d",
 			dTemps[TEMP_M],				//Motor
 			motorAddTemps[0],			//Fre
 			motorAddTemps[3],			//DSPIC6011
@@ -1755,7 +1776,7 @@ void CRSSMotorCtrlDlg::RecordTemp()
 			dMaxIncTemp,				//Maximium temperature increment from last 1 hour
 			dAmbIncTemp,				//Maximium internal ambient temperature increment from last 1 hour
 			elapsedTime / 1000
-		);
+		);*/
 
 		
 
@@ -1773,45 +1794,17 @@ void CRSSMotorCtrlDlg::RecordTemp()
 
 			CString szData;
 
-			if (bMotorAddTemps)
-			{
-				//szData.Format("TimeId\tAmp\tCurrent\tT_FaseA\tT_FaseB\tT_FaseC\tT_Motor\tT_Fre\tT_Int\tT_Amb\tT_6011\tT_DAC\tT_Tapa\tT_5015\tTPC\r\n");
 
+			szData.Format("%d\t%.1f\t%.2f\t%.1f\t%.1f\t%.1f\t%.1f\t%d\r\n",
+				iDataTempRecord / 40,
+				0.0,//motorParameters[BCAN_PARAM_AW_ACTROTORAMPLITUDE],
+				curT,
+				dTemps[TEMP_T1],
+				dTemps[TEMP_T2],
+				dTemps[TEMP_T3],
+				dTemps[TEMP_M],
 
-				szData.Format("%d\t%.1f\t%.2f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%d\r\n",
-					iDataTempRecord / 40,
-					0.0,//motorParameters[BCAN_PARAM_AW_ACTROTORAMPLITUDE],
-					curT,
-
-					dTemps[TEMP_T1],
-					dTemps[TEMP_T2],
-					dTemps[TEMP_T3],
-					dTemps[TEMP_M],
-					motorAddTemps[0],
-					motorAddTemps[1],
-					motorAddTemps[2],
-					motorAddTemps[3],
-					motorAddTemps[4],
-					motorAddTemps[5],
-					motorAddTemps[6],
-
-					elapsedTime / 1000);
-
-				SetDlgItemText(IDC_STATIC_TEMP_SHOWDATA, szAddTemp);
-			}
-			else
-			{
-				szData.Format("%d\t%.1f\t%.2f\t%.1f\t%.1f\t%.1f\t%.1f\t%d\r\n",
-					iDataTempRecord / 40,
-					0.0,//motorParameters[BCAN_PARAM_AW_ACTROTORAMPLITUDE],
-					curT,
-					dTemps[TEMP_T1],
-					dTemps[TEMP_T2],
-					dTemps[TEMP_T3],
-					dTemps[TEMP_M],
-
-					elapsedTime / 1000);
-			}
+				elapsedTime / 1000);
 
 			fTempInfo.Write(szData.GetBuffer(), szData.GetLength());
 

@@ -231,21 +231,22 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define MOTOR_AUX_TEMP_TAPA			5
 		#define MOTOR_AUX_TEMP_IND			6
 
-		double						motorAddTemps[MOTOR_AUX_TEMPS];
-		bool						bMotorAddTemps;
+		//double						motorAddTemps[MOTOR_AUX_TEMPS];
+		//bool						bMotorAddTemps;
 
 		//Estabilització de la temperatura: Temperatures en 1 hora (3600s)
 		//#define						STABLE_TEMPS			11
 		//#define						STABLE_TIME				360
-		#define						STABLE_TIME_PERIOD_S	600//Temperature stabilization period [s] (default: 3600)
-		#define						TEMPERATURE_TYP_DEV		1.0//Allowed temperature typical deviation [ªC] 
-		
+		#define						STABLE_TIME_PERIOD_S	3600//Temperature stabilization period [s] (default: 3600)
+		//#define						TEMPERATURE_TYP_DEV		1.0//Allowed temperature typical deviation [ªC] 
+		#define						TEMPERATURE_MAX_DIFF	1.0//Allowed temperature typical deviation [ªC] 
+
 		//To be deleted
-		double						dTBuffer[STABLE_TIME_PERIOD_S][STABLE_TIME_PERIOD_S];//??
-		double						dTInc[STABLE_TIME_PERIOD_S];//??
-		int							iTIdx;//?
-		double						dMaxIncTemp;//??
-		double						dAmbIncTemp;//??
+		//double						dTBuffer[STABLE_TIME_PERIOD_S][STABLE_TIME_PERIOD_S];//??
+		//double						dTInc[STABLE_TIME_PERIOD_S];//??
+		//int							iTIdx;//?
+		//double						dMaxIncTemp;//??
+		//double						dAmbIncTemp;//??
 
 		void						GetDevices();
 		void						GetDefaultDeviceParameters();
