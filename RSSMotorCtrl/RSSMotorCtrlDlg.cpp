@@ -97,8 +97,9 @@ void CRSSMotorCtrlDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_SLIDER_VEL_VEL, scVelocity);
 	DDX_Control(pDX, IDC_SLIDER_VEL_ACC, scAcceleration);
 	DDX_Control(pDX, IDC_COMBO_RAMP_UP_UNITS, cmbRampUpUnitsSel);
-	DDX_Control(pDX, IDC_CHECK_THERMALANALYSIS, cbThermalAnalysis);
-	DDX_Check(pDX, IDC_CHECK_THERMALANALYSIS, cbThermalAnalysisBool);
+	DDX_Control(pDX, IDC_CHECK_ADV_THERMALANALYSIS, cbThermalAnalysis);
+	DDX_Check(pDX, IDC_CHECK_ADV_THERMALANALYSIS, cbThermalAnalysisBool);
+	DDX_Control(pDX, IDC_COMBO_ADV_SELECTSLAVE, cmbSlaveSel);
 }
 
 BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
@@ -118,7 +119,7 @@ BEGIN_MESSAGE_MAP(CRSSMotorCtrlDlg, CDialogEx)
 	ON_BN_CLICKED(IDCANCEL, &CRSSMotorCtrlDlg::OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON_REC_T, &CRSSMotorCtrlDlg::OnBnClickedButtonRecT)
 	ON_BN_CLICKED(IDC_BUTTON_DEV_BRAKE, &CRSSMotorCtrlDlg::OnBnClickedButtonDevBrake)
-	ON_BN_CLICKED(IDC_CHECK_THERMALANALYSIS, &CRSSMotorCtrlDlg::OnBnClickedCheckThermalanalysis)
+	ON_BN_CLICKED(IDC_CHECK_ADV_THERMALANALYSIS, &CRSSMotorCtrlDlg::OnBnClickedCheckThermalanalysis)
 END_MESSAGE_MAP()
 
 //EF mod
@@ -133,7 +134,7 @@ UINT ThreadInterface(LPVOID pParam)
 	CString szInfo;
 
 	pObject->bThreadRIActive = true;
-
+	
 	while (pObject->bThreadRIActive)
 	{
 		//Initialize time counters
@@ -271,6 +272,8 @@ UINT ThreadWorker(LPVOID pParam)
 // CRSSMotorCtrlDlg message handlers
 BOOL CRSSMotorCtrlDlg::OnInitDialog()
 {
+	CString szInfo;
+
 	CDialogEx::OnInitDialog();
 
 	// Add "About..." menu item to system menu.
@@ -303,6 +306,9 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 
 	//Load list boxes
 	LoadComboBox();
+
+	//Load MAP with IngeniaMC/Summit Error Codes - Decoded from STATUS register is FAIL bit is active
+	MapErrorCodes(&cecmW.errorCodesMap);
 
 	//Init Device Data
 	InitDevData();
@@ -617,6 +623,8 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampSend()
 {
 	CString szText;
 
+	PLOGI << "Click on RAMP SEND button with value " << iLoopTargetPos << " [enc]";
+
 	SetLoopValue(IDC_EDIT_RAMP_INITIALPOS, &fLoopInitial);//also used as a single-step motion
 	iLoopTargetPos = (int)fLoopInitial;//Set TargetPos [encoder counts - Motor(inner)]
 	
@@ -643,15 +651,16 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop()
 	//Get Loop Data
 	if (bLoopStart)
 	{
-		motionMode		= DEV_M_POS;
-		iDelayCounter	= 0;
-		iLoopState		= LOOP_STATE_INITIAL;
-
 		SetLoopValue(IDC_EDIT_RAMP_INITIALPOS, &fLoopInitial);
-
 		//Update iLoopTargetPos [encoder absolute counts]
 		iLoopTargetPos = (int)fLoopInitial;
 
+		PLOGI << "Click on START RAMP LOOP button with an initial value of " << iLoopTargetPos << " [enc]";
+		
+		motionMode		= DEV_M_POS;
+		iDelayCounter	= 0;
+		iLoopState		= LOOP_STATE_INITIAL;
+			   
 		//Set PROFILER! Never forget to do this before any other EtherCAT command to the slave
 		UpdateProfilerLimits();
 
@@ -659,6 +668,8 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRampStartloop()
 
 		bSendLoopCommand = true;
 	}
+	else //STOP
+		PLOGI << "Click on STOP RAMP LOOP button";
 }
 
 
@@ -948,7 +959,7 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 			//Increase real samples quantity in temperature vector
 			if (samplesQ < STABLE_TIME_PERIOD_S)	samplesQ++;
 
-			//Set out of real temperature range values to be updated easily with real temperature values
+			//Set values out of real temperature range to be updated easily with real temperature values
 			min_val = 1000.;
 			max_val = -100.;
 			//Update MIN or MAX values in temperature vector
@@ -958,7 +969,6 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 			}
 			//Calculate (MAX - MIN) difference 
 			temperature_diff = max_val - min_val;
-
 
 			//Check if temperature is already stabilized or not
 			//But only if elapsed time is more than one hour and the temperature vector is full
@@ -979,13 +989,15 @@ void CRSSMotorCtrlDlg::CheckThermalAnalysis(void) {
 				typ_dev = sqrt(variance);//[ºC]
 
 				if (typ_dev < TEMPERATURE_TYP_DEV) {*/
-				if (temperature_diff < TEMPERATURE_MAX_DIFF){
+				if (temperature_diff <= TEMPERATURE_MAX_DIFF){
 					//END: TEMPERATURE IS STABILIZED!!
-					PLOGI << "'Thermal Analysis' FINISHED SUCCESSFULLY after " << elapsedTimeTotal_seconds <<
-						" seconds with a max. temperature diff. of "	<< temperature_diff << " [ºC]";
+					szText.Format("'Thermal Analysis' FINISHED SUCCESSFULLY after %d [s] with a max. temperature diff. of %.2f [ºC]",
+						(unsigned int)elapsedTimeTotal_seconds, temperature_diff);
+					PLOGI << szText;
 
-					GetDlgItemText(IDC_TA_STATIC, szText);
-
+					//SetDlgItemText(IDC_TA_STATIC, szText);//Someday
+					SetDlgItemText(IDC_STATIC_TEMP_SHOWDATA, szText);//Temporal solution
+					
 					//Show Thermal Analysis Dialog
 					CThermalAnalysisDlg().DoModal();
 					// TODO : Modify Text in Thermal Analysis Dialog
@@ -1132,11 +1144,40 @@ void CRSSMotorCtrlDlg::ExecuteMotion()
 	}	   	  
 }
 
+
+void CRSSMotorCtrlDlg::MapErrorCodes(std::map<uint32_t, CString> *errCodes) 
+{
+	for (int i = 0; i < 30; i++) {
+		errCodes->insert( { err[i].hex, err[i].description } );
+		//errCodes->insert( std::make_pair(err[i].hex, err[i].description) );	//another way
+	}
+}
+
+void CRSSMotorCtrlDlg::ShowErrorCodeDescription(int * lastError, std::map<uint32_t, CString> *errCodes) 
+{
+	static CString szText;
+	static bool isDone = false;
+	static std::map<uint32_t, CString>::iterator it;
+	
+	if (!isDone) {//Do it only once
+		//MAP find
+		it = errCodes->find((uint32_t)*lastError);
+
+		szText.Format("[0x%08X] %s", (uint32_t)it->first, it->second );
+		SetDlgItemText(IDC_STATIC_TEMP_SHOWDATA, szText);//Temporally written here, pending mod.
+		//LOG
+		PLOGI << szText;
+
+		*lastError = 0;//Set to 0, although it will be rewritten in the next EtherCAT Cycle
+		isDone = true;//Do not repeat (not expected more than one error by execution, by now)
+	}
+}
+
 void CRSSMotorCtrlDlg::GetDeviceParameters()
 {
-	static short StatusAct	= 0;
-	static int LastError	= 0;
-	char pBuffer8[8];
+	static short	StatusAct	= 0;
+	static int		LastError	= 0;
+	static char		pBuffer8[8];
 	//char pBuffer16[16];
 
 	StatusAct = cecmW.GetStatus();//CiA register
@@ -1152,6 +1193,10 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 		//Last error update
 		LastError = cecmW.GetLastError();//CiA register
 		SetDlgItemInt(IDC_EDIT_DEV_LASTERROR, LastError);//temporally done here, to be moved out!
+		if (LastError != 0) {
+			//Show Error drescription
+			ShowErrorCodeDescription(&LastError, &cecmW.errorCodesMap);
+		}
 
 		////////////Actual Values
 			//Motor (inner)
@@ -1185,6 +1230,8 @@ void CRSSMotorCtrlDlg::GetDeviceParameters()
 
 void CRSSMotorCtrlDlg::UpdateInterfaceControls()
 {
+	static CString szInfo = "";
+
 	// Updates Interface EditBoxes in "PARAMETERS" GroupBox by calling function ShowUpdate() once for each selected field
 //Core
 	//Module
@@ -1206,6 +1253,13 @@ void CRSSMotorCtrlDlg::UpdateInterfaceControls()
 	//Bus voltage
 	ShowParameter(DEV_BUS_V);
 
+
+	//Load fixed/hard-coded variables
+	//NIC+TextID
+	if (szInfo == "" & (cecmW.PrimaryNIC[0] != 0) ) {
+		szInfo.Format("%s", cecmW.PrimaryNIC);
+		SetDlgItemText(IDC_EDIT_DEV_IDNIC, szInfo);
+	}
 
 	//TODO : Update STATUS + STATUS_SEMAPHORE + LASTERROR here!
 }
@@ -1356,12 +1410,12 @@ void CRSSMotorCtrlDlg::InitLoopSM()
 	   
 	//Initial values
 	gearFactor		= motorParameters[BETH_PARAM_DR_GEARRATIO];
-	iLoopDelay		= 20;
-	fLoopUpper		= 90.;//[degrees/s] - motor --> TODO :module
-	fLoopInitial	= 75.;//[degrees/s] - motor --> TODO :module
-	fLoopLower		= 60.;//[degrees/s] - motor --> TODO :module
-	fLoopMaxVel		= (float)motorParameters[BETH_PARAM_DR_MAXVEL];//[rev/s] - motor
-	fLoopMaxAcc		= (float)motorParameters[BETH_PARAM_DR_MAXACC];//[rev/s^2] - motor
+	iLoopDelay		= 2;
+	fLoopUpper		= 20;//[degrees/s] - motor --> TODO :module
+	fLoopInitial	= 10.;//[degrees/s] - motor --> TODO :module
+	fLoopLower		= 0.;//[degrees/s] - motor --> TODO :module
+	fLoopMaxVel		= (float)motorParameters[BETH_PARAM_DR_MAXVEL]/10;//[rev/s] - motor
+	fLoopMaxAcc		= (float)motorParameters[BETH_PARAM_DR_MAXACC]/10;//[rev/s^2] - motor
 
 	//Initial State
 	iLoopState		= LOOP_STATE_INITIAL;
@@ -1376,6 +1430,7 @@ void CRSSMotorCtrlDlg::InitLoopSM()
 	szText.Format("%.0f",	gearFactor);	SetDlgItemText(IDC_EDIT_DEV_GFACTOR, szText);
 
 	cmbRampUpUnitsSel.SetCurSel(DEGREES);//selects default "0" which is [degrees] units
+	cmbSlaveSel.SetCurSel(BR1_M1);//O is default (B1_M1)
 
 	PLOGI << "InitLoopSM() function called";
 }
@@ -1499,8 +1554,8 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonVelSetVelAcc()
 	PLOGI << "Click on 'SetVel & SetAcc' button: TBD!";
 }
 
-void CRSSMotorCtrlDlg::UpdateProfilerLimits() {
-
+void CRSSMotorCtrlDlg::UpdateProfilerLimits()
+{
 	CString szText;
 
 	//Get Profiler limits from user
@@ -1510,9 +1565,8 @@ void CRSSMotorCtrlDlg::UpdateProfilerLimits() {
 	fLoopMaxAcc = (float)(atof(szText)*gearFactor);
 	//Send Profiler limits to drive (motor)
 	cecmW.SetProfiler(&fLoopMaxVel, &fLoopMaxAcc);
-	/*float tVel = 20.0;
-	float tAcc = 20.0;
-	cecmW.SetProfiler(&tVel, &tAcc);//Test*/
+
+	PLOGI << "Setting/Sending Profiler limits: " << fLoopMaxVel << " [rev/s] and " << fLoopMaxAcc << " [rev/s^2]";
 }
 
 void CRSSMotorCtrlDlg::UpdateVelMotionInterface()
@@ -1628,7 +1682,7 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonRecData()
 		//Write Header Infor
 		//CString szLine; szLine.Format("Sample\tAbsPos\tPos\tTarget\tError\tVel\tTVel\tParamA\tParamB\tParamC\tRawA\tRawB\tRawC\tRawM\tCurA\tCurB\tCurC\tCurT\tCurM\tPosM\tTPosM\tVelM\tTVelM\tAccM\tTAccM\tTimeStamp\r\n");
 		CString szLine; 
-		szLine.Format("Sample\tMActPos[enc]\tMTarPos[enc]\tMActVel[rev/s]\tMTarVel[rev/s]\tMActAcc[rev/s^2]\tMTarAcc[rev/s^2]\tActPos[enc]\tActVel[mrev/s]\tActAcc[mrev/^2]\tPrimaryT[ºC]\tMotorT[ºC]\tCurrentA[A]\tCurrentB[A]\tCurrentC[A]\tTimeStamp\r\n");
+		szLine.Format("#Sample\tMActPos[enc]\tMTarPos[enc]\tMActVel[rev/s]\tMTarVel[rev/s]\tMActAcc[rev/s^2]\tMTarAcc[rev/s^2]\tActPos[enc]\tActVel[mrev/s]\tActAcc[mrev/^2]\tPrimaryT[ºC]\tMotorT[ºC]\tCurrentA[A]\tCurrentB[A]\tCurrentC[A]\tTimeStamp\r\n");
 		curDataFile.Write(szLine.GetBuffer(), szLine.GetLength());
 
 		//Update Interface
@@ -1897,17 +1951,30 @@ void CRSSMotorCtrlDlg::OnCbnSelchangeComboRampUpUnits()
 	UpdateData(FALSE);
 
 }
+void CRSSMotorCtrlDlg::OnCbnSelchangeComboAdvSelectslave()
+{
+	CString m_strItemSelected;
+
+	cmbSlaveSel.GetLBText(cmbSlaveSel.GetCurSel(), m_strItemSelected);
+	UpdateData(FALSE);
+}
 void CRSSMotorCtrlDlg::LoadComboBox() {
+
 	CString str = _T("");
 
+	//Load 'Ramp Units'
 	str.Format(_T("[degrees]"));
 	cmbRampUpUnitsSel.AddString(str);
-
 	str.Format(_T("[counts]"));
 	cmbRampUpUnitsSel.AddString(str);
-
 	str.Format(_T("[radians]"));
 	cmbRampUpUnitsSel.AddString(str);
+
+	//Load 'Select Slave'
+	str.Format(_T("0 (BR1_M1)"));
+	cmbSlaveSel.AddString(str);
+	str.Format(_T("1 (BR2_M2)"));
+	cmbSlaveSel.AddString(str);
 }
 
 void CRSSMotorCtrlDlg::InitLog(void) {
@@ -1926,19 +1993,29 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonDevFaultReset(void){
 void CRSSMotorCtrlDlg::OnBnClickedButtonDevBrake(){
 	// TODO: Add your control notification handler code here
 	static uint16_t Data	= 0x02;//Force brake lock
-	//uint16_t Data	= 0x01;//Force brake release
-	void* pData		= &Data;//Pointer to the value
+	//static uint16_t Data	= 0x01;//Force brake release
+	
+	//static uint16_t Data	= CTRLW_OPERATION;
+	//static uint16_t Data	= CTRLW_SWITCHON;
+	//static uint16_t Data	= CTRLW_SWITCHOFF;
+	void* pData				= &Data;//Pointer to the value
 
 	static ECM_SLAVE_ADDR regAddress;
 
 	static uint16_t pucCnt		= 0;
-	static uint16_t numBytes	= 2;
+	static uint16_t numBytes	= sizeof(uint16_t);
 
-	regAddress.p.ado = 0x129;//Axis-1 "Brake override"
-	
-	cecmW.SendAsyncRequest(pData, BWR, regAddress, numBytes, &pucCnt);//	ECM_SUCCESS = 0;
 
-	PLOGI << "Click on 'Device BRAKE' button";
+	//{ 0x03E9, 0x2010, sizeof(uint16_t), FPWR, "Writes 0x010 axis-1 (Control Word - RW)"},//Switch on
+	//regAddress.p.ado = 0x0129;//Axis-1 "Brake override"
+	//regAddress.p.adp = 0;//Axis-1 "Brake override"
+	//regAddress.l = 0x01290000;//Axis-1 "Brake override"
+	regAddress.p.ado = 0x2010;//Axis-1 "Control Word"
+	regAddress.p.adp = 0x03e9;//RSS-400
+	//regAddress.p.adp = 0x03ea;//RSS-100
+	//int res = cecmW.SendAsyncRequest(pData, FPWR, regAddress, numBytes, &pucCnt);//	ECM_SUCCESS = 0;
+	int res = cecmW.SendAsyncRequest(pData, BWR, regAddress, numBytes, &pucCnt);//	ECM_SUCCESS = 0;
+	PLOGI << "Click on 'Device BRAKE' button: " << res;
 }
 
 void CRSSMotorCtrlDlg::OnBnClickedCancel()

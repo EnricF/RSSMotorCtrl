@@ -2,6 +2,7 @@
 
 #include "framework.h"
 #include "ecm.h"
+#include <map>
 //#include "RobGUI.h"
 
 #ifndef ECMW_H
@@ -25,7 +26,7 @@ typedef enum ethercatCommandTypes
 	ARMW
 }ethercatCommandTypes;
 
-typedef struct PDmapP {
+typedef struct _PDmapP {
 	uint8_t *pucDio_DisplayOperationMode;//"Operation mode display" pointer		(CiA)
 	uint8_t *pucDio_PrimaryTemperature;//"Primary temperature value" pointer	(Axis1)
 	uint8_t *pucDio_MotorTemperature;//"Motor temperature value" pointer		(Axis1)
@@ -52,7 +53,18 @@ class CecmW {
 
 //VARIABLES SECTION
 	public:
+		//ECM_NIC NicList;
+		char PrimaryNIC[64];	//For external access
+		char SecondaryNIC[64];	//For external access
+
+		std::map<uint32_t, CString> errorCodesMap;//Struct will be loaded into map for easier search later
+
+		std::map<CString, uint32_t> errorCodesMap2;//Struct will be loaded into map for easier search later
+
+
 	private:
+		char PrimaryNICNameDefault[64]	= "TwinCAT Gigabit Primary Adapter";//Now is fixed, TODO: read/load from NIC adapters array
+		char SecondaryNICNameDefault[64]= "TwinCAT Gigabit Secondary Adapter";//Now is fixed, TODO: read/load from NIC adapters array
 
 	//protected:
 		
@@ -125,43 +137,70 @@ class CecmW {
 		//---------------------------
 		// Device Parameters GETTERS
 		//---------------------------
-		static short	GetStatus(void);			//CiA register - Motor(inner)
-		static int		GetActPos(void);			//CiA register - Motor(inner)
-		static int		GetActVel(void);			//CiA register - Motor(inner)
-		static float	GetTemperaturePrimary(void);//Axis1 register - Drive
-		static float	GetTemperatureMotor(void);	//Axis1 register - Motor
-		static float	GetModuleActPos(void);		//Axis1 register - Module(outter)
-		
-		/*
-		* Gets "Current[A]" readings (A, B and C phases) from Driver/Motor
-		* @param *cA	A pointer where CurrentA must be saved (typ. at motorParameters[])
-		* @param *cB	A pointer where CurrentB must be saved
-		* @param *cC	A pointer where CurrentC must be saved
+
+		/* Gets 'Status word' (CiA) register of a selected Slave - Motor(inner)
+		*	@param	selSlave	Numerical ID of selected slave
+		*	@return				Two-bytes with 'Status word' value
 		*/
-		static void		GetCurrentsABC(double *cA, double *cB, double *cC);
+		static short	GetStatus(int selSlave = 0);
+		/* Gets 'Position Actual' (CiA) register of a selected Slave - Motor(inner)
+		*	@param	selSlave	Numerical ID of selected slave
+		*	@return				Four-bytes with 'Position actual' value in [enc. counts]. Relative: value is 0 after power on.
+		*/
+		static int		GetActPos(int selSlave = 0);
+		/* Gets 'Velocity Actual' (CiA) register of a selected Slave - Motor(inner)
+		*	@param	selSlave	Numerical ID of selected slave
+		*	@return				Four-bytes with 'Velocity value' in [rev/s]
+		*/
+		static int		GetActVel(int selSlave = 0);	
+		/* Gets 'Primary Temperature' (Axis1) register of a selected Slave - Drive
+		*	@param	selSlave	Numerical ID of selected slave
+		*	@return				Four-bytes (real) with 'Status word' value
+		*/
+		static float	GetTemperaturePrimary(int selSlave = 0);
+		/* Gets 'Motor Temperature' (Axis1) register of a selected Slave - Motor(inner)
+		*	@param	selSlave	Numerical ID of selected slave
+		*	@return				Four-bytes (real) with 'Status word' value
+		*/
+		static float	GetTemperatureMotor(int selSlave = 0);
+		/* Gets 'Module Position Actual' (Axis1) register of a selected Slave - Module(outter)
+		*	@param	selSlave	Numerical ID of selected slave
+		*	@return				Four-bytes (real) with 'Status word' value
+		*/
+		static float	GetModuleActPos(int selSlave = 0);
+				
+		
+		/* Gets "Current[A]" readings (A, B and C phases) from Driver/Motor
+		* @param selSlave	Numerical ID of selected slave
+		* @param *cA		A pointer where CurrentA (real) will be written (typ. at motorParameters[])
+		* @param *cB		A pointer where CurrentB (real) will be written 
+		* @param *cC		A pointer where CurrentC (real) will be written 
+		*/
+		static void		GetCurrentsABC(double *cA, double *cB, double *cC, int selSlave = 0);
 
 		/*
 		* Gets "Bus voltage value [V]" reading from Drive/Motor
-		* @return		Bus voltage [V]
+		* @param	selSlave	Numerical ID of selected slave
+		* @return				Bus voltage (real) [V]
 		*/
-		static float	GetBusVoltage(void);
+		static float	GetBusVoltage(int selSlave = 0);
 
-		/*
-		* Gets "Last error" register
-		* @return		Last error code (decimal)
+		/* Gets "Last error" register
+		* @param	selSlave	Numerical ID of selected slave
+		* @return				Last error code (decimal)
 		*/
-		static int		GetLastError(void);			//Axis1 register
+		static int		GetLastError(int selSlave = 0);			//Axis1 register
 
 		//---------------------------
 		// Device Parameters SETTERS
 		//---------------------------
 
-		/*
-		* Sets Profiler limits: MaxVel MaxAcc and MaxDec
+		/* Sets Profiler limits: MaxVel MaxAcc and MaxDec
+		* @param selSlave		Numerical ID of selected slave
 		* @param *fLoopMaxVel	A pointer to Profiler/Motor Max. Velocity in [rev/s]
 		* @param *fLoopMaxAcc	A pointer to Profiler/Motor Max. Acc&Dec. in [rev/s]
 		*/
-		static void SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc);
+		static void SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc, int selSlave = 0);
 		static void SetProfilerMaxVel(float fVel);
 		static void SetProfilerMaxAcc(float fAcc);
 		static void SetProfilerMaxDec(float fDec);

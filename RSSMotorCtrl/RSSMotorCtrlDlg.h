@@ -237,9 +237,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//Estabilització de la temperatura: Temperatures en 1 hora (3600s)
 		//#define						STABLE_TEMPS			11
 		//#define						STABLE_TIME				360
-		#define						STABLE_TIME_PERIOD_S	3600//Temperature stabilization period [s] (default: 3600)
+		#define						STABLE_TIME_PERIOD_S	3/*600*///Temperature stabilization period [s] (default: 3600)
 		//#define						TEMPERATURE_TYP_DEV		1.0//Allowed temperature typical deviation [ªC] 
-		#define						TEMPERATURE_MAX_DIFF	1.0//Allowed temperature typical deviation [ªC] 
+		#define						TEMPERATURE_MAX_DIFF	2.0//Allowed temperature typical deviation [ªC] 
 
 		//To be deleted
 		//double						dTBuffer[STABLE_TIME_PERIOD_S][STABLE_TIME_PERIOD_S];//??
@@ -368,6 +368,8 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						SetGearRatio();
 		//void						SetSerial();
 
+		void MapErrorCodes(std::map<uint32_t, CString> *errCodes);
+		void ShowErrorCodeDescription(int *LastError, std::map<uint32_t, CString> *errCodes);
 
 	// Construction
 	public:
@@ -421,6 +423,10 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		afx_msg void OnCbnSelchangeComboRampUpUnits();
 		afx_msg void LoadComboBox();
 		enum cmbUnits {	DEGREES, COUNTS, RADIANS };
+		// Control for 'Select Slave' ComboBox (Advanced)
+		CComboBox cmbSlaveSel;
+		afx_msg void OnCbnSelchangeComboAdvSelectslave();
+
 
 		// Picture "Semaphore" to shos STATUS register. YELLOW at start, RED if STATUS_FAULT_BIT == 1, GREEN otherwise
 		CBitmap picStatusSemaphore;
@@ -449,4 +455,5 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int64_t ThermalAnalysisTimePrev;	//TTAG of previous Temperature recording [seconds]
 		int64_t ThermalAnalysisFreq;		//Frequency (clock) value for Thermal analysis [Hz?]
 		void CheckThermalAnalysis(void);
+
 };

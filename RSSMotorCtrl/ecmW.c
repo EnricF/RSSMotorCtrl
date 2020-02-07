@@ -2746,23 +2746,6 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 	*/
 	//SetPDmapP(hndMaster, ".DevState", &VarDesc);
 
-//BITRACK ETHERCAT SLAVES ID's
-#define BP1_M1	0	//Robotic Arm #1, Motor #1. First slave connected to Master ETH0
-#define BP1_M2	1	//Robotic Arm #1, Motor #2
-#define BP1_M3	2	//Robotic Arm #1, Motor #3
-#define BP1_M4	3	//Robotic Arm #1, Motor #4
-#define BP2_M1	4	//Robotic Arm #2, Motor #1. Connected to BP1_M4
-#define BP2_M2	5	//Robotic Arm #2, Motor #2
-#define BP2_M3	6	//Robotic Arm #2, Motor #3
-#define BP2_M4	7	//Robotic Arm #2, Motor #4
-#define BP3_M1	8	//Robotic Arm #3, Motor #1. Connected to BP2_M4
-#define BP3_M2	9	//Robotic Arm #3, Motor #2
-#define BP3_M3	10	//Robotic Arm #3, Motor #3
-#define BP3_M4	11	//Robotic Arm #3, Motor #4
-#define BL1_M4	12	//Laparoscopic Arm #1, Motor #1
-#define BL1_M4	13	//Laparoscopic Arm #1, Motor #2
-#define BL1_M4	14	//Laparoscopic Arm #1, Motor #3
-#define BL1_M4	15	//Laparoscopic Arm #1, Motor #4. Last slave connected to Master ETH0, connected directly to Master ETH1 (redundancy)
 	//	TODO : GETTERS and SETTERS must receive SLAVE ID as a parameter.
 	//	TODO : (In GUI) User must select SLAVE ID (Combo Box?). Default value is always 0 (first slave connected to ETHERCAT MASTER).
 
@@ -3575,6 +3558,8 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 				pNicList[i].macAddr.b[4] = 0xc7;
 				pNicList[i].macAddr.b[5] = 0xe4;
 				ECM_INIT_MAC(macPrimary, pNicList[i].macAddr);
+				memcpy(&PrimaryNIC[0], &PrimaryNICNameDefault[0], sizeof(PrimaryNIC) );
+
 				pNicList[i+1].macAddr.b[0] = 0x00;
 				pNicList[i+1].macAddr.b[1] = 0x01;
 				pNicList[i+1].macAddr.b[2] = 0x05;
@@ -3582,6 +3567,7 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 				pNicList[i+1].macAddr.b[4] = 0xc7;
 				pNicList[i+1].macAddr.b[5] = 0xe5;
 				ECM_INIT_MAC(macRedundant, pNicList[i+1].macAddr);
+				memcpy(&SecondaryNIC[0], &SecondaryNICNameDefault[0], sizeof(SecondaryNIC));
 			}
 			else {//old code: default if i != 0
 			
@@ -4002,6 +3988,8 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 #ifdef _CONSOLE
 				printf("Warning: Not all slaves changed into operational !!\n");
 #endif
+				return EXIT_FAILURE;//restart?!?!?! NOT WORKING AS EXPECTED (EVERY TRY FAILS AGAIN AND AGAIN)
+				// TODO : CLOSE SW CORRECTLY!
 			}
 		}
 
@@ -4393,7 +4381,7 @@ int CecmW::SendAsyncRequest(void *pData, uint8_t cmdType, ECM_SLAVE_ADDR regAddr
 //---------
 // GETTERS
 //---------
-short CecmW::GetStatus(void) {
+short CecmW::GetStatus(int selSlave) {
 
 	if (pucDio_StatusWord != NULL)
 		return *(short*)pucDio_StatusWord;	
@@ -4401,7 +4389,7 @@ short CecmW::GetStatus(void) {
 		return 0;
 }
 
-int CecmW::GetActPos(void) {
+int CecmW::GetActPos(int selSlave) {
 	static int actPos;
 
 	if (pucDio_PositionActual != NULL) {
@@ -4412,7 +4400,7 @@ int CecmW::GetActPos(void) {
 		return 0;
 }
 
-int CecmW::GetActVel(void) {
+int CecmW::GetActVel(int selSlave) {
 	static int actVel;
 
 	if (pucDio_VelocityActual != NULL) {
@@ -4423,8 +4411,7 @@ int CecmW::GetActVel(void) {
 		return 0;
 }
 
-
-float CecmW::GetTemperaturePrimary(void) {
+float CecmW::GetTemperaturePrimary(int selSlave) {
 	static float priTemperature;
 
 	if (pucDio_PrimaryTemperature != NULL) {
@@ -4435,7 +4422,7 @@ float CecmW::GetTemperaturePrimary(void) {
 		return 0;
 }
 
-float CecmW::GetTemperatureMotor(void) {
+float CecmW::GetTemperatureMotor(int selSlave) {
 	static float motorTemperature;
 
 	if (pucDio_PrimaryTemperature != NULL) {
@@ -4446,7 +4433,7 @@ float CecmW::GetTemperatureMotor(void) {
 		return 0;
 }
 
-void CecmW::GetCurrentsABC(double *cA, double *cB, double *cC) {
+void CecmW::GetCurrentsABC(double *cA, double *cB, double *cC, int selSlave) {
 	static float val;
 	if (pucDio_CurrentA != NULL) {
 		ecmCpuToLe(&val, pucDio_CurrentA, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
@@ -4462,7 +4449,7 @@ void CecmW::GetCurrentsABC(double *cA, double *cB, double *cC) {
 	}
 }
 
-float CecmW::GetBusVoltage(void) {
+float CecmW::GetBusVoltage(int selSlave) {
 	static float busVoltage;
 
 	if (pucDio_BusVoltage != NULL) {
@@ -4473,7 +4460,7 @@ float CecmW::GetBusVoltage(void) {
 		return 0;
 }
 
-int CecmW::GetLastError(void) {
+int CecmW::GetLastError(int selSlave) {
 	static int lastError;
 
 	if (pucDio_LastError != NULL) {
@@ -4487,7 +4474,7 @@ int CecmW::GetLastError(void) {
 // 8192 counts/loop
 // gear 1200?
 
-float CecmW::GetModuleActPos(void) {
+float CecmW::GetModuleActPos(int selSlave) {
 	static int rotorPosition;
 
 	if (pucDio_ModulePositionActual != NULL) {
@@ -4523,12 +4510,11 @@ void CecmW::SetProfilerMaxDec(float fDec) {
 }
 
 //Sets Profiler limits
-void CecmW::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc) {
+void CecmW::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc, int selSlave) {
 	SetProfilerMaxVel(*fLoopMaxVel);
 	SetProfilerMaxAcc(*fLoopMaxAcc);
 	SetProfilerMaxDec(*fLoopMaxAcc);
 }
-
 
 
 /******************************************************************************/

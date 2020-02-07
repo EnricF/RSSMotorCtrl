@@ -113,14 +113,14 @@
 #define IDC_EDIT_PARAM_BUS_V_MAX        1099
 #define IDC_EDIT_DEV_GFACTOR            1100
 #define IDC_COMBO_RAMP_UP_UNITS         1101
-#define IDC_EDIT_STATUS_SEMAPHORE       1102
-#define IDC_BUTTON_DEV_FAULT_RESET      1103
-#define IDC_STATIC_TEMP_SHOWDATA        1104
-#define IDC_STATIC_PARAM_MAX            1105
-#define IDC_IPADDRESS1                  1105
-#define IDC_BUTTON_DEV_BRAKE            1106
-#define IDC_CHECK_THERMALANALYSIS       1107
-#define IDC_TA_STATIC                   1108
+#define IDC_BUTTON_DEV_FAULT_RESET      1102
+#define IDC_STATIC_TEMP_SHOWDATA        1103
+#define IDC_STATIC_PARAM_MAX            1104
+#define IDC_BUTTON_DEV_BRAKE            1105
+#define IDC_CHECK_ADV_THERMALANALYSIS   1106
+#define IDC_TA_STATIC                   1107
+#define IDC_STATIC_DEV_IDNIC            1108
+#define IDC_EDIT_DEV_IDNIC              1109
 #define IDC_EPA16                       1110
 #define IDC_EPA17                       1111
 #define IDC_EPA18                       1112
@@ -130,6 +130,8 @@
 #define IDC_EPMAX16                     1116
 #define IDC_EPMAX17                     1117
 #define IDC_EPMAX18                     1118
+#define IDC_STATIC_ADV_SELECTSLAVE      1119
+#define IDC_COMBO_ADV_SELECTSLAVE       1120
 
 // Next default values for new objects
 // 
