@@ -495,21 +495,21 @@ static uint16_t *pDevState = NULL, *pWcState = NULL;
 /* Reference to process variables */
 static uint8_t *pucDio = NULL;
 //EF mod: extra pointers
-//Writings to slave
-static uint8_t *pucDio_OperationMode	= NULL;//"Operation mode" pointer 		0x6060 (CiA)
-static uint8_t *pucDio_ControlWord		= NULL;//"Control Word" pointer			0x6040 (CiA)
-static uint8_t *pucDio_TargetPosition	= NULL;//"Target position" pointer		0x607A (CiA)
-static uint8_t *pucDio_TargetVelocity	= NULL;//"Target velocity" pointer		0x60FF (CiA)
-static uint8_t *pucDio_ProfilerMaxVel	= NULL;//"Profiler max. velocity" pointer
-static uint8_t *pucDio_ProfilerMaxAcc	= NULL;//"Profiler max. acceleration" pointer
-static uint8_t *pucDio_ProfilerMaxDec	= NULL;//"Profiler max. deceleration" pointer
-//Axis1
+// RPDO Outputs - Writings to slave
+static uint8_t *pucDio_OperationMode		= NULL;//"Operation mode" pointer 		0x6060 (CiA)
+static uint8_t *pucDio_ControlWord			= NULL;//"Control Word" pointer			0x6040 (CiA)
+static uint8_t *pucDio_TargetPosition		= NULL;//"Target position" pointer		0x607A (CiA)
+static uint8_t *pucDio_TargetVelocity		= NULL;//"Target velocity" pointer		0x60FF (CiA)
+static uint8_t *pucDio_ProfilerMaxVel		= NULL;//"Profiler max. velocity" pointer
+static uint8_t *pucDio_ProfilerMaxAcc		= NULL;//"Profiler max. acceleration" pointer
+static uint8_t *pucDio_ProfilerMaxDec		= NULL;//"Profiler max. deceleration" pointer
+	//Axis1
 static uint8_t *pucDio_OperationModeAxis1	= NULL;//"Operation mode" pointer	0x2014 (Axis1)
 static uint8_t *pucDio_ControlWordAxis1		= NULL;//"Control Word" pointer		0x2010 (Axis1)
 static uint8_t *pucDio_PositionSetPoint		= NULL;//"Target position" pointer	0x2020 (Axis1) - Motor(inner)
 static uint8_t *pucDio_VelocitySetPoint		= NULL;//"Target velocity" pointer	0x2021 (Axis1) - Motor(inner)
 
-//Readings from slave
+// TPDO Outputs - Readings from slave
 static uint8_t *pucDio_StatusWord			= NULL;//"Status mode" pointer					(CiA)
 static uint8_t *pucDio_PositionActual		= NULL;//"Position actual" pointer				(CiA) - Motor(inner)
 static uint8_t *pucDio_VelocityActual		= NULL;//"Velocity actual" pointer				(CiA) - Motor(inner)
@@ -548,13 +548,8 @@ typedef struct commandsMatrix {
 
 ECM_HANDLE hndMasterP				= NULL;//To save a copy hndMaster pointer and give outter acccess to it (under test)
 
-// OLD - Temporally global, to be moved inside its class
-//FILE		*ECMlogFile;
-//const char	*cECMlogFile		= "C:\\workspace\\logFile.txt";
-
-
+ //FILE
 char		*cECMlogFilename	= "C:\\workspace\\Data\\logFile_%s.txt";
-
 
 
 
@@ -2648,18 +2643,56 @@ static int ChangeEcatState(ECM_HANDLE hndDevice, ECM_HANDLE hndMaster,
 }
 
 /*
+ * New: Helper code to get references to virtual and real process variables.
+ */
+void CecmW::ecmSetupProcesData(ECM_HANDLE hndMaster)
+{
+	ECM_VAR_DESC VarDesc;
+	int res = 0;//result
+
+	/*Sets in a PDmapP structure all pointers of all slaves related to PD
+	* By now, all slaves share the same PD structure (RX/TX), and their order is fixed
+	*/
+
+	//TPDO Inputs - Master readings
+	res = SetPDmapP(hndMaster, "Statusword",			&slavePD[0].pDio_StatusWord,		ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Position actual",				&slavePD[0].pDio_PositionActual,	ECM_INPUT_DATA);// - Motor(inner)
+	SetPDmapP(hndMaster, "Velocity actual",				&slavePD[0].pDio_VelocityActual,	ECM_INPUT_DATA);// - Motor(inner)
+	SetPDmapP(hndMaster, "Mode of operation display",	&slavePD[0].pDio_DisplayOperationMode,ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Primary temperature value",	&slavePD[0].pDio_PrimaryTemperature,ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Motor temperature value",		&slavePD[0].pDio_MotorTemperature,	ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Primary temperature value",	&slavePD[0].pDio_PrimaryTemperature,ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Primary SSI - Position",		&slavePD[0].pDio_ModulePositionActual,ECM_INPUT_DATA);// - Module(outter)
+	SetPDmapP(hndMaster, "Current A value",				&slavePD[0].pDio_CurrentA,			ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Current B value",				&slavePD[0].pDio_CurrentB,			ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Current C value",				&slavePD[0].pDio_CurrentC,			ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Bus voltage value",			&slavePD[0].pDio_BusVoltage,		ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Status word",					&slavePD[0].pDio_StatusWordAxis1,	ECM_INPUT_DATA);
+	SetPDmapP(hndMaster, "Last error",					&slavePD[0].pDio_LastError,			ECM_INPUT_DATA);
+	//RPDO Outputs - Master writings
+	SetPDmapP(hndMaster, "Controlword",					&slavePD[0].pDio_ControlWord,		ECM_OUTPUT_DATA);//"Control Word" pointer		0x6040 (CiA)
+	SetPDmapP(hndMaster, "Target position",				&slavePD[0].pDio_TargetPosition,	ECM_OUTPUT_DATA);//"Target position" pointer		0x607A (CiA) - Motor(inner)
+	SetPDmapP(hndMaster, "Target velocity",				&slavePD[0].pDio_TargetVelocity,	ECM_OUTPUT_DATA);//"Target velocity" pointer		0x60FF (CiA) - Motor(inner)
+	SetPDmapP(hndMaster, "Operation mode",				&slavePD[0].pDio_OperationMode,		ECM_OUTPUT_DATA);//"Operation mode" pointer 		0x6060 (CiA)
+	SetPDmapP(hndMaster, "Profiler max. velocity",		&slavePD[0].pDio_ProfilerMaxVel,	ECM_OUTPUT_DATA);
+	SetPDmapP(hndMaster, "Profiler max. acceleration",	&slavePD[0].pDio_ProfilerMaxAcc,	ECM_OUTPUT_DATA);
+	SetPDmapP(hndMaster, "Profiler max. deceleration",	&slavePD[0].pDio_ProfilerMaxDec,	ECM_OUTPUT_DATA);
+		//Axis1
+	SetPDmapP(hndMaster, "Operation mode",				&slavePD[0].pDio_OperationModeAxis1,ECM_OUTPUT_DATA);//"Operation mode" pointer	0x2014 (Axis1)
+	SetPDmapP(hndMaster, "Position set-point",			&slavePD[0].pDio_PositionSetPoint,	ECM_OUTPUT_DATA);//"Target position" pointer	0x2020 (Axis1) - Motor(inner)
+	SetPDmapP(hndMaster, "Velocity set-point",			&slavePD[0].pDio_VelocitySetPoint,	ECM_OUTPUT_DATA);//"Target velocity" pointer	0x2021 (Axis1) - Motor(inner)
+	SetPDmapP(hndMaster, "Control word",				&slavePD[0].pDio_ControlWordAxis1,	ECM_OUTPUT_DATA);//"Control Word" pointer	0x2010 (Axis1)
+}
+
+/*
  * Helper code to get references to virtual and real process variables.
  */
-static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
+static void ecmSetupProcesData_old(ECM_HANDLE hndMaster)
 {
     ECM_VAR_DESC VarDesc;
     int result;
-
-    /*
-     * Get reference to virtual variables
-     */
-
-
+	    
+    // Get reference to virtual variables
     result = ecmLookupVariable(hndMaster, ".DevState", &VarDesc, ECM_FLAG_GET_FIRST);
     if (ECM_SUCCESS == result) {
         result = ecmGetDataReference(hndMaster, ECM_INPUT_DATA,
@@ -2738,16 +2771,10 @@ static void ecmTestSetupProcesData(ECM_HANDLE hndMaster)
 #endif
     }	
 
-
-	//TODO : validated new mode of operation
-
-	/*Sets in a PDmapP structure all pointers of all slaves related to PD
-	* By now, all slaves share the same PD structure (RX/TX), and their order is fixed
+	// OLD WAY
+	/*Sets in each pointer an unique PD PD address. Valid for a single SLAVE (ECM_FLAG_GET_FIRST is always selected)
+	* Note: All slaves share the same PD structure (RX/TX) and their order is fix
 	*/
-	//SetPDmapP(hndMaster, ".DevState", &VarDesc);
-
-	//	TODO : GETTERS and SETTERS must receive SLAVE ID as a parameter.
-	//	TODO : (In GUI) User must select SLAVE ID (Combo Box?). Default value is always 0 (first slave connected to ETHERCAT MASTER).
 
 	//Get Status Word (CiA)
 	result = ecmLookupVariable(hndMaster, "Statusword", &VarDesc,
@@ -3431,7 +3458,7 @@ CecmW::CecmW() {
 
 CecmW::~CecmW() {
 	PLOG_NONE << "ECM object destroyed";
-	Sleep(100);
+
 	//Old
 	//fclose(ECMlogFile);
 }
@@ -3465,7 +3492,7 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 	// LOG execution arguments
 	strcpy(&execArguments[0], argv[0]);
 	strcat(execArguments, " ");
-	for (int n = 1; n < (argc-1); n++) {
+	for (int n = 1; n < argc; n++) {
 		strcat(execArguments, argv[n]);
 		strcat(execArguments, " ");
 	}
@@ -3520,9 +3547,9 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 #endif
 	}
 
-	/* Get number of available NICs */
+	// Get number of available NICs
 	if (ecmGetNicList(NULL, &numAdapter) != ECM_SUCCESS) {
-		PLOG_FATAL << "Getting number of available adapter failed";
+		PLOG_FATAL << "Getting number of available adapter failed, numAdapter = " << numAdapter;
 #ifdef _CONSOLE
 		fprintf(ECMlogFile,"Getting number of available adapter failed\n");
 #endif
@@ -3530,7 +3557,7 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 		return(-1);
 	}
 	else {
-		pNicList = (PECM_NIC)calloc(numAdapter, sizeof(ECM_NIC));
+		pNicList = (PECM_NIC)calloc(numAdapter = 5, sizeof(ECM_NIC));
 		if (pNicList != NULL) {
 			ecmGetNicList(pNicList, &numAdapter);
 			if ((ulConfigFlags & ECM_TEST_FLAG_PRINT_NICLIST) != 0) {
@@ -3801,12 +3828,13 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 	if ((ulConfigFlags & ECM_TEST_FLAG_MEMORY_CONFIG) != 0) {
 		free((void *)cfgInitData.Config.Buffer.pAddress);
 	}
+
 	if (result != ECM_SUCCESS) {
 		PLOG_ERROR << "Reading configuration failed with " << ecmResultToString(result);
 #ifdef _CONSOLE
 		fprintf(stdout,"Reading configuration failed with %s\n", ecmResultToString(result));
 #endif
-		(void)ecmTestCleanup();
+		(void)ecmTestCleanup();		
 		return(result);
 	}
 
@@ -3875,10 +3903,8 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 	// TODO : modify this function to work with more than one slave in chain
 	//----------------------------------------------------------------------
 	PLOG_INFO << "PD mapping starts";
-	ecmTestSetupProcesData(hndMaster);//PD mapping is done in this function
-	/*for (int n = 0; n > &pSlaveCount; n++) {
-		ecmTestSetupProcesData(hndMaster, PD[n]);//PD mapping is done in this function
-	}*/
+	ecmSetupProcesData(hndMaster);//PD mapping is done in this function - NEW
+	//ecmSetupProcesData_old(hndMaster);//PD mapping is done in this function
 
 
 	// Attach the master to the device
@@ -4053,8 +4079,15 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 			// If more than X linkLost
 			// If PD mapping is done
 			// Then EXIT (reconnect)
-			if ( (linkLost > 1) && (*pucDio_StatusWord != 0x00) ) {
-				PLOGE << "Link Lost counter: " << linkLost << " RECONNECTING!";
+			if ( (linkLost > 1) && (*slavePD[0].pDio_StatusWord != 0x00) ) {
+			//	if ((linkLost > 1) && (*pucDio_StatusWord != 0x00)) {//old
+
+				PLOGE << "Link Lost counter: " << (int)linkLost << " RECONNECTING!";
+				break;
+			}
+
+			if (!is_running) {
+				PLOGI << "ThreadIActive = false";
 				break;
 			}
 
@@ -4197,9 +4230,9 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 
 	(void)ecmTestCleanup();
 
-	PLOG_INFO << "End";
+	PLOG_INFO << "ECM main() End";
 #ifdef _CONSOLE
-	fprintf(stdout, "End\n");
+	fprintf(stdout, "ECM main() End\n");
 #endif
 
 	return 0;
@@ -4227,21 +4260,40 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 //Motion
 */
 
-bool CecmW::MotionFRampMode(int iLoopTargetPos) {
+//Commands matrixes --> VALIDATED
+commandsMatrix ProfilePosMatrix[numCommandsProfilePos];
+commandsMatrix ProfileVelMatrix[numCommandsProfileVel];
 
-	//Commands matrix (STATIC!) --> VALIDATED
-	static commandsMatrix ProfilePosMatrix[numCommandsProfilePos] = {
-		pucDio_OperationModeAxis1,	PROFILE_POS_M,
-		pucDio_ControlWordAxis1,	CTRLW_SWITCHOFF,
-		pucDio_ControlWordAxis1,	CTRLW_SWITCHON,
-		pucDio_ControlWordAxis1,	CTRLW_OPERATION,
-		pucDio_ControlWordAxis1+1,	0x00,//Clear new set-point bit
-		pucDio_PositionSetPoint,	0x00,//POSITION TARGET
-		pucDio_ControlWordAxis1+1,	0x02,//New set-point
-	};
+void CecmW::fillProfilePosMatrix(int selSlave) {
+
+	ProfilePosMatrix[0] = { slavePD[selSlave].pDio_OperationModeAxis1,	PROFILE_POS_M };
+	ProfilePosMatrix[1] = { slavePD[selSlave].pDio_ControlWordAxis1,	CTRLW_SWITCHOFF };
+	ProfilePosMatrix[2] = { slavePD[selSlave].pDio_ControlWordAxis1,	CTRLW_SWITCHON };
+	ProfilePosMatrix[3] = { slavePD[selSlave].pDio_ControlWordAxis1,	CTRLW_OPERATION };
+	ProfilePosMatrix[4] = { slavePD[selSlave].pDio_ControlWordAxis1 + 1,0x00 };
+	ProfilePosMatrix[5] = { slavePD[selSlave].pDio_PositionSetPoint,	0x00 };
+	ProfilePosMatrix[6] = { slavePD[selSlave].pDio_ControlWordAxis1 + 1,0x02 };
+
+}
+
+bool CecmW::MotionFRampMode(int iTargetPos, int selSlave) {
+	static bool isFill = false;
+	static int prevSlave = 0;//default is always Slave-0
+
+	if (prevSlave != selSlave) {
+		fillProfilePosMatrix(selSlave);
+		prevSlave = selSlave;
+		iCommandProfilePos = 0;//Mandatory to setup each Slave at their first Profile Position command
+	}
+	
+	if (!isFill) {//First execution only
+		fillProfilePosMatrix(selSlave);
+		isFill = true;
+	}
 
 	//Set Profiler Position operation mode
-	*pucDio_OperationModeAxis1 = PROFILE_POS_M;
+	//Just to be sure, maybe it has another value from previous GUI 'operation mode' selection, to be removed someday
+	*slavePD[selSlave].pDio_OperationModeAxis1 = PROFILE_POS_M;
 
 	if ( iCommandProfilePos < (numCommandsProfilePos) ) {
 
@@ -4250,7 +4302,7 @@ bool CecmW::MotionFRampMode(int iLoopTargetPos) {
 		}
 		else {
 			//ecmCpuToLe(ProfilePosMatrix[iCommandProfilePos].PDOpointer, &iLoopTargetPos, (const uint8_t *)"\x04\x00");//TODO : It is not working, why?		
-			ecmCpuToLe(&LEbuffer[0], &iLoopTargetPos, (const uint8_t *)"\x04\x00");
+			ecmCpuToLe(&LEbuffer[0], &iTargetPos, (const uint8_t *)"\x04\x00");
 			*ProfilePosMatrix[iCommandProfilePos].PDOpointer		= LEbuffer[0];
 			*(ProfilePosMatrix[iCommandProfilePos].PDOpointer + 1)	= LEbuffer[1];
 			*(ProfilePosMatrix[iCommandProfilePos].PDOpointer + 2)	= LEbuffer[2];
@@ -4265,21 +4317,34 @@ bool CecmW::MotionFRampMode(int iLoopTargetPos) {
 	}
 }
 
-bool CecmW::MotionFProfileVelMode(float fProfileVel_rev_s) {
-	
-	//Commands matrix
-	static commandsMatrix ProfileVelMatrix[numCommandsProfileVel] = {
-		pucDio_OperationModeAxis1,	PROFILE_VEL_M,
-		pucDio_ControlWordAxis1,	CTRLW_SWITCHOFF,
-		pucDio_ControlWordAxis1,	CTRLW_SWITCHON,
-		pucDio_ControlWordAxis1,	CTRLW_OPERATION,
-		pucDio_ControlWordAxis1+1,	0x00,//Two bytes PROFILE MOTION command: 2nd byte (new set-point bit reset!)
-		pucDio_VelocitySetPoint,	0x00,//VELOCITY SET-POINT
-		pucDio_ControlWordAxis1+1,	0x02,//Two bytes PROFILE MOTION command: 2nd byte
-	};
+void CecmW::fillProfileVelMatrix(int selSlave) {
+	ProfileVelMatrix[0] = { slavePD[selSlave].pDio_OperationModeAxis1,	PROFILE_VEL_M };
+	ProfileVelMatrix[1] = { slavePD[selSlave].pDio_ControlWordAxis1,	CTRLW_SWITCHOFF };
+	ProfileVelMatrix[2] = { slavePD[selSlave].pDio_ControlWordAxis1,	CTRLW_SWITCHON };
+	ProfileVelMatrix[3] = { slavePD[selSlave].pDio_ControlWordAxis1,	CTRLW_OPERATION };
+	ProfileVelMatrix[4] = { slavePD[selSlave].pDio_ControlWordAxis1 + 1,0x00 };
+	ProfileVelMatrix[5] = { slavePD[selSlave].pDio_PositionSetPoint,	0x00 };
+	ProfileVelMatrix[6] = { slavePD[selSlave].pDio_ControlWordAxis1 + 1,0x02 };
+}
+
+bool CecmW::MotionFProfileVelMode(float fProfileVel_rev_s, int selSlave) {
+	static bool isFill		= false;
+	static int prevSlave	= 0;//default is always Slave-0
+
+	if (prevSlave != selSlave) {
+		fillProfileVelMatrix(selSlave);
+		prevSlave = selSlave;
+		iCommandProfileVel = 0;//Mandatory to setup each Slave at their first Profile Velocity command
+	}
+
+	if (!isFill) {//First execution only
+		fillProfileVelMatrix(selSlave);
+		isFill = true;
+	}
 
 	//Set Profiler Velocity operation mode
-	*pucDio_OperationModeAxis1 = PROFILE_VEL_M;
+	//Just to be sure, maybe it has another value from previous GUI 'operation mode' selection, to be removed someday
+	*slavePD[selSlave].pDio_OperationModeAxis1 = PROFILE_VEL_M;
 
 	if (iCommandProfileVel < (numCommandsProfileVel)) {
 		if (iCommandProfileVel != 5) {
@@ -4303,8 +4368,7 @@ bool CecmW::MotionFProfileVelMode(float fProfileVel_rev_s) {
 
 }
 
-bool CecmW::MotionFVelMode(int iTargetVel_inc_s) {
-
+bool CecmW::MotionFVelMode(int iTargetVel_inc_s) {//OLD
 	//Commands matrix
 	static commandsMatrix VelMatrix[numCommandsVel] = {
 		pucDio_ControlWord,		CTRLW_FAULT_RST,//FAULT RESET
@@ -4343,11 +4407,11 @@ bool CecmW::MotionFVelMode(int iTargetVel_inc_s) {
 	}
 }
 
-void CecmW::StatusFaultReset(void) {
-	*pucDio_ControlWordAxis1 = 0x80;//dec: 128
+void CecmW::StatusFaultReset(int selSlave) {
+	*slavePD[selSlave].pDio_ControlWordAxis1 = CTRLW_FAULT_RST;//0x80
 }
 
-void CecmW::MotionStop(void) {
+void CecmW::MotionStop(int selSlave) {//TO BE UPDATED!! Must receive selSlave param and so on...
 
 	static const int numCommandsStop = 8;
 	static commandsMatrix StopMatrix[numCommandsStop] = {
@@ -4378,13 +4442,15 @@ int CecmW::SendAsyncRequest(void *pData, uint8_t cmdType, ECM_SLAVE_ADDR regAddr
 	return ret;
 }
 
+//	TODO : GETTERS and SETTERS must receive SLAVE ID as a parameter.
+
 //---------
 // GETTERS
 //---------
-short CecmW::GetStatus(int selSlave) {
+short CecmW::GetStatus(int selSlave) {		
 
-	if (pucDio_StatusWord != NULL)
-		return *(short*)pucDio_StatusWord;	
+	if (slavePD[selSlave].pDio_StatusWord != NULL)//Checks if pointer is valid
+		return *(short*)(slavePD[selSlave].pDio_StatusWord);
 	else
 		return 0;
 }
@@ -4392,8 +4458,8 @@ short CecmW::GetStatus(int selSlave) {
 int CecmW::GetActPos(int selSlave) {
 	static int actPos;
 
-	if (pucDio_PositionActual != NULL) {
-		ecmCpuToLe(&actPos, pucDio_PositionActual, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_PositionActual != NULL) {
+		ecmCpuToLe(&actPos, slavePD[selSlave].pDio_PositionActual, (const uint8_t *)"\x04\x0");
 		return actPos;
 	}		
 	else
@@ -4403,8 +4469,8 @@ int CecmW::GetActPos(int selSlave) {
 int CecmW::GetActVel(int selSlave) {
 	static int actVel;
 
-	if (pucDio_VelocityActual != NULL) {
-		ecmCpuToLe(&actVel, pucDio_VelocityActual, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_VelocityActual != NULL) {
+		ecmCpuToLe(&actVel, slavePD[selSlave].pDio_VelocityActual, (const uint8_t *)"\x04\x0");
 		return actVel;
 	}
 	else
@@ -4414,8 +4480,8 @@ int CecmW::GetActVel(int selSlave) {
 float CecmW::GetTemperaturePrimary(int selSlave) {
 	static float priTemperature;
 
-	if (pucDio_PrimaryTemperature != NULL) {
-		ecmCpuToLe(&priTemperature, pucDio_PrimaryTemperature, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_PrimaryTemperature != NULL) {
+		ecmCpuToLe(&priTemperature, slavePD[selSlave].pDio_PrimaryTemperature, (const uint8_t *)"\x04\x0");
 		return priTemperature;
 	}
 	else
@@ -4425,8 +4491,8 @@ float CecmW::GetTemperaturePrimary(int selSlave) {
 float CecmW::GetTemperatureMotor(int selSlave) {
 	static float motorTemperature;
 
-	if (pucDio_PrimaryTemperature != NULL) {
-		ecmCpuToLe(&motorTemperature, pucDio_MotorTemperature, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_PrimaryTemperature != NULL) {
+		ecmCpuToLe(&motorTemperature, slavePD[selSlave].pDio_MotorTemperature, (const uint8_t *)"\x04\x0");
 		return (motorTemperature);
 	}
 	else
@@ -4435,16 +4501,16 @@ float CecmW::GetTemperatureMotor(int selSlave) {
 
 void CecmW::GetCurrentsABC(double *cA, double *cB, double *cC, int selSlave) {
 	static float val;
-	if (pucDio_CurrentA != NULL) {
-		ecmCpuToLe(&val, pucDio_CurrentA, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
+	if (slavePD[selSlave].pDio_CurrentA != NULL) {
+		ecmCpuToLe(&val, slavePD[selSlave].pDio_CurrentA, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
 		*cA = (double)val;//Convert to DOUBLE variable and save it
 	}
-	if (pucDio_CurrentB != NULL) {
-		ecmCpuToLe(&val, pucDio_CurrentB, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_CurrentB != NULL) {
+		ecmCpuToLe(&val, slavePD[selSlave].pDio_CurrentB, (const uint8_t *)"\x04\x0");
 		*cB = (double)val;
 	}
-	if (pucDio_CurrentC != NULL) {
-		ecmCpuToLe(&val, pucDio_CurrentC, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_CurrentC != NULL) {
+		ecmCpuToLe(&val, slavePD[selSlave].pDio_CurrentC, (const uint8_t *)"\x04\x0");
 		*cC = (double)val;
 	}
 }
@@ -4452,8 +4518,8 @@ void CecmW::GetCurrentsABC(double *cA, double *cB, double *cC, int selSlave) {
 float CecmW::GetBusVoltage(int selSlave) {
 	static float busVoltage;
 
-	if (pucDio_BusVoltage != NULL) {
-		ecmCpuToLe(&busVoltage, pucDio_BusVoltage, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
+	if (slavePD[selSlave].pDio_BusVoltage != NULL) {
+		ecmCpuToLe(&busVoltage, slavePD[selSlave].pDio_BusVoltage, (const uint8_t *)"\x04\x0");//It is a FLOAT variable
 		return(busVoltage);
 	}
 	else
@@ -4463,22 +4529,22 @@ float CecmW::GetBusVoltage(int selSlave) {
 int CecmW::GetLastError(int selSlave) {
 	static int lastError;
 
-	if (pucDio_LastError != NULL) {
-		ecmCpuToLe(&lastError, pucDio_LastError, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_LastError != NULL) {
+		ecmCpuToLe(&lastError, slavePD[selSlave].pDio_LastError, (const uint8_t *)"\x04\x0");
 		return lastError;
 	}
 	else
 		return 0;
 }
 
-// 8192 counts/loop
-// gear 1200?
+// 8192 counts/loop (outter) - 65536 counts/loop (inner)
+// gear 1:1200?
 
 float CecmW::GetModuleActPos(int selSlave) {
 	static int rotorPosition;
 
-	if (pucDio_ModulePositionActual != NULL) {
-		ecmCpuToLe(&rotorPosition, pucDio_ModulePositionActual, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_ModulePositionActual != NULL) {
+		ecmCpuToLe(&rotorPosition, slavePD[selSlave].pDio_ModulePositionActual, (const uint8_t *)"\x04\x0");
 		return (float)rotorPosition;
 	}
 	else
@@ -4489,33 +4555,115 @@ float CecmW::GetModuleActPos(int selSlave) {
 //---------
 // SETTERS
 //---------
-void CecmW::SetProfilerMaxVel(float fVel) {
-	//static int setVel = (int)fVel;
+void CecmW::SetProfilerMaxVel(float fVel, int selSlave) {
+	if (fVel > (MOTOR_VEL_DR_REV_S/2) )
+	{
+		PLOGI << "Profiler Velocity out of limits: " << fVel << "/" << MOTOR_VEL_DR_REV_S / 2 << "(max)";
+		fVel = MOTOR_VEL_DR_REV_S/20;
+		PLOGE << "MOTOR_ACC = " << fVel << "[rev/s]";
+	}
 
-	if (pucDio_ProfilerMaxVel != NULL) 
-		ecmCpuToLe(pucDio_ProfilerMaxVel, &fVel, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_ProfilerMaxVel != NULL)
+		ecmCpuToLe(slavePD[selSlave].pDio_ProfilerMaxVel, &fVel, (const uint8_t *)"\x04\x0");
 }
-void CecmW::SetProfilerMaxAcc(float fAcc) {
-	//static int setAcc = (int)fAcc;
+void CecmW::SetProfilerMaxAcc(float fAcc, int selSlave) {
 
-	if (pucDio_ProfilerMaxAcc != NULL) 
-		ecmCpuToLe(pucDio_ProfilerMaxAcc, &fAcc, (const uint8_t *)"\x04\x0");
+	if (fAcc > (MOTOR_ACC_DR_REV_S/2) )
+	{
+		PLOGI << "Profiler Acceleration out of limits: " << fAcc << "/" << MOTOR_ACC_DR_REV_S / 2 << "(max)";
+		fAcc = MOTOR_ACC_DR_REV_S/20;
+		PLOGE << "MOTOR_ACC = " << fAcc << "[rev/s^2]";
+	}
+	if (slavePD[selSlave].pDio_ProfilerMaxAcc != NULL)
+		ecmCpuToLe(slavePD[selSlave].pDio_ProfilerMaxAcc, &fAcc, (const uint8_t *)"\x04\x0");
 }
 
-void CecmW::SetProfilerMaxDec(float fDec) {
-	//static int setDec = (int)fDec;
+void CecmW::SetProfilerMaxDec(float fDec, int selSlave) {
+	if (fDec > (MOTOR_ACC_DR_REV_S/2))
+	{
+		PLOGI << "Profiler Deceleration out of limits: " << fDec << "/" << MOTOR_ACC_DR_REV_S / 2 << "(max)";
+		fDec = MOTOR_ACC_DR_REV_S/20;
+		PLOGE << "MOTOR_DEC = " << fDec << "[rev/s^2]";
+	}
 
-	if (pucDio_ProfilerMaxDec != NULL) 
-		ecmCpuToLe(pucDio_ProfilerMaxDec, &fDec, (const uint8_t *)"\x04\x0");
+	if (slavePD[selSlave].pDio_ProfilerMaxDec != NULL)
+		ecmCpuToLe(slavePD[selSlave].pDio_ProfilerMaxDec, &fDec, (const uint8_t *)"\x04\x0");
 }
 
 //Sets Profiler limits
 void CecmW::SetProfiler(float *fLoopMaxVel, float *fLoopMaxAcc, int selSlave) {
-	SetProfilerMaxVel(*fLoopMaxVel);
-	SetProfilerMaxAcc(*fLoopMaxAcc);
-	SetProfilerMaxDec(*fLoopMaxAcc);
+	SetProfilerMaxVel(*fLoopMaxVel, selSlave);
+	SetProfilerMaxAcc(*fLoopMaxAcc, selSlave);
+	SetProfilerMaxDec(*fLoopMaxAcc, selSlave);
 }
 
+void CecmW::SetOperationalState(int selSlave) {
+	uint8_t op[4] = { 0x00,0x00,0x0,0x0F };
+
+	if (slavePD[selSlave].pDio_ControlWordAxis1 != NULL) {
+		ecmCpuToLe(slavePD[selSlave].pDio_ControlWordAxis1, &op[0], (const uint8_t *)"\x04\x0");
+		iCommandProfilePos = 4;
+	}
+}
+
+
+/******************************************************************************/
+/*								PM mapping						             */
+/******************************************************************************/
+bool CecmW::SetPDmapP(ECM_HANDLE hndMaster, CString str, uint8_t **ptr, ECM_PROC_DATA_TYPE direction) {
+
+	static ECM_VAR_DESC VarDesc;
+
+	int result;
+	int off		= 0;	//offset bytes in PD object, not in Master data struct!
+	int slavePDoffset;	//offset bytes between slaves in PM structure
+#ifndef _X86_
+	slavePDoffset = PDMapSizeBytes / 8;//64-bits
+	PLOGE << "Review if wrong Structure(PDMap) size happens for x64 architecture";
+#else
+	slavePDoffset = PDMapSizeBytes / 4;//32-bits
+#endif
+
+	// Get pointer to PD variable
+	result = ecmLookupVariable(hndMaster, str, &VarDesc, ECM_FLAG_GET_FIRST | ECM_FLAG_IGNORE_CASE);
+	if (ECM_SUCCESS == result) {
+		result = ecmGetDataReference(hndMaster, direction,
+			VarDesc.ulBitOffs / 8, 2, (void **)ptr);
+#ifdef _CONSOLE
+		if (result != ECM_SUCCESS) {
+			fprintf(stdout, "Failed to get reference to variable 'Statusword'\n");
+		}
+#endif
+	}
+	else {//END - ERROR!
+		PLOGE << "PD mapping error. Variable not found: '" << str << "'";
+		return false;
+	}
+
+	int numSlaves = 2;
+	for (int i = 1; i < numSlaves; i++) {
+		//Set pointer address offset
+		off = i * slavePDoffset;
+
+		// Get pointer to PD variable
+		result = ecmLookupVariable(hndMaster, str, &VarDesc, ECM_FLAG_GET_NEXT | ECM_FLAG_IGNORE_CASE);
+		if (ECM_SUCCESS == result) {
+			result = ecmGetDataReference(hndMaster, direction,
+				VarDesc.ulBitOffs / 8, 2, (void **)(ptr + off));
+#ifdef _CONSOLE
+			if (result != ECM_SUCCESS) {
+				fprintf(stdout, "Failed to get reference to variable 'Statusword'\n");
+			}
+#endif
+		}
+		else {//END - ERROR!
+			PLOGE << "PD mapping error. Variable not found: '" << str << "'";
+			return false;
+		}
+	}
+	//END - OK
+	return true;
+}
 
 /******************************************************************************/
 /*             OS and/or platform specific initialization code                */

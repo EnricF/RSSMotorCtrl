@@ -3,6 +3,12 @@
 #ifndef GLOBALVAR_H
 #define GLOBALVAR_H
 
+//Memory leaks detection - Under test
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+
+
 //ECM template project
 #include <getopt.h>
 #include <ecm.h>
@@ -53,6 +59,11 @@
 #define BL1_M2	13	//Laparoscopic Arm #1, Motor #2
 #define BL1_M3	14	//Laparoscopic Arm #1, Motor #3
 #define BL1_M4	15	//Laparoscopic Arm #1, Motor #4. Last slave connected to Master ETH0, connected directly to Master ETH1 (redundancy)
+
+
+//Real parameters - Motor model 400
+#define						MOTOR_VEL_DR_REV_S	400	//Motor velocity dynamic range
+#define						MOTOR_ACC_DR_REV_S	666	//Motor acceleration dynamic range
 
 //SUMMIT ERROR CODES
 typedef struct _ErrorCodes {

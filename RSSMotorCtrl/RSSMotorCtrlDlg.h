@@ -18,7 +18,7 @@ class CRSSMotorCtrlDlg : public CDialogEx
 {
 
 	public:
-
+		void						InitHomeModulePos(void);
 		//////////////////////////////////////////////////////////////////////////////////////
 		//									CONTROL THREADS									//
 		//////////////////////////////////////////////////////////////////////////////////////
@@ -63,9 +63,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//									ETHERCAT SLAVE OBJECTS						//
 		//////////////////////////////////////////////////////////////////////////////////
 
-		CecmW						cecmW;//EtherCAT worker/link
-
-
+		CecmW						cecmW;		//EtherCAT object including a master and multiple slaves
+		unsigned int				slaveActive = 0;//A numerical ID of the selected Slave to control/monitor (default is 0)
+		
 		//////////////////////////////////////////////////////////////////////////////////
 		//									2D Interface								//
 		//////////////////////////////////////////////////////////////////////////////////
@@ -116,9 +116,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_M_PWM		4
 		#define						DEV_M_STEP		5
 
-		//Real parameters - Motor model 400
-		#define						MOTOR_VEL_DR_REV_S	400	//Motor velocity dynamic range
-		#define						MOTOR_ACC_DR_REV_S	666	//Motor acceleration dynamic range
+		//Real parameters - Motor model 400 - IN GLOBAL_VAR.H file
+		//#define						MOTOR_VEL_DR_REV_S	400	//Motor velocity dynamic range
+		//#define						MOTOR_ACC_DR_REV_S	666	//Motor acceleration dynamic range
 
 		//Variables
 		double						dDevData[DEV_PARAMS][DEV_FIELDS];				//Device Data PARAMETERS
@@ -235,18 +235,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//bool						bMotorAddTemps;
 
 		//Estabilització de la temperatura: Temperatures en 1 hora (3600s)
-		//#define						STABLE_TEMPS			11
-		//#define						STABLE_TIME				360
-		#define						STABLE_TIME_PERIOD_S	3/*600*///Temperature stabilization period [s] (default: 3600)
-		//#define						TEMPERATURE_TYP_DEV		1.0//Allowed temperature typical deviation [ªC] 
-		#define						TEMPERATURE_MAX_DIFF	2.0//Allowed temperature typical deviation [ªC] 
-
-		//To be deleted
-		//double						dTBuffer[STABLE_TIME_PERIOD_S][STABLE_TIME_PERIOD_S];//??
-		//double						dTInc[STABLE_TIME_PERIOD_S];//??
-		//int							iTIdx;//?
-		//double						dMaxIncTemp;//??
-		//double						dAmbIncTemp;//??
+		#define						STABLE_TIME_PERIOD_S	3600//Temperature stabilization period [s] (default: 3600)
+		#define						TEMPERATURE_MAX_DIFF	2.0	//Allowed temperature typical deviation [ªC] 
+		int							homeModulePos_enc;			//Module position at start, saved as HOME variable in [enc counts] - Module (outter)
 
 		void						GetDevices();
 		void						GetDefaultDeviceParameters();
@@ -279,25 +270,36 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						LOOP_STATE_DELAY_FL			6
 
 		bool						bLoopStart;
-		//EDIT BOXES
-		float						fLoopInitial;	//[encoder counts - Motor(inner)]
-		float						fLoopUpper;		//[encoder counts - Motor(inner)]
-		float						fLoopLower;		//[encoder counts - Motor(inner)]
-		int							iLoopDelay;
-		int							iLoopState;
-		
-		
-		//#define						LOOP_MIN_ERROR_RAD			0.0017 //[rad]
-		#define						LOOP_MIN_ERROR_ENC			655 //[absolute encoder counts - external]
 
-		float						fLoopPos;		//[encoder counts - Motor(inner)]
-		int							iLoopPos;		//[encoder counts - Motor(inner)]
-		float						fLoopTargetPos;	//[encoder counts - Motor(inner)]
-		int							iLoopTargetPos;	//[encoder counts - Motor(inner)] - MOTOR INPUT
-		float						fLoopMaxVel;	//[rev/s]
-		float						fLoopMaxAcc;	//[rev/s^2]
+	//Position
+		//EDIT BOXES (GUI) - Unit conversion is done by SetLoopValue() function
+		float						fLoopInitial_EB_enc;		//[encoder counts] - Motor(inner)
+		float						fLoopUpper_EB_enc;			//[encoder counts] - Motor(inner)
+		float						fLoopLower_EB_enc;			//[encoder counts] - Motor(inner)
+		//INTEGER VALUES (EtherCAT) --> Drive&Motor!
+		int							iLoopInitial_enc;			//[encoder counts] - Motor(inner)
+		int							iLoopUpper_enc;				//[encoder counts] - Motor(inner)
+		int							iLoopLower_enc;				//[encoder counts] - Motor(inner)
+	//Velocity, Acc, Dec - Unit conversion is done by other means, from Module to Motor frame
+		float						fModuleLoopMaxVel_EB;		//in GUI units		- Module(outter)
+		float						fModuleLoopMaxAcc_EB;		//in GUI units		- Module(outter)
+		float						fLoopMaxVel_enc_s;			//[rev/s]			- Motor(inner)
+		float						fLoopMaxAcc_enc_s2;			//[rev/s]			- Motor(inner))
+	//Delay			   		
+		int							iLoopDelay;
+	//State
+		int							iLoopState;
+	//LOOP CONTROL: INTEGER VALUES (EtherCAT) --> Drive&Motor!
+		int							iLoopTargetPos_enc;			//EtherCAT: [encoder counts] - Motor(inner)
+		int							iLoopActPos_enc;			//EtherCAT: [encoder counts] - Motor(inner
+	//Margin
+		#define						LOOP_MIN_ERROR_ENC			512 //[encoder counts] - Motor(inner)
+
+		//¿¿¿¿¿?????
+		int							iLoopTargetPosLast;//What is this?
+
 		
-		int							iLoopTargetPosLast;
+
 		bool						bSendLoopCommand;
 
 		bool						bSendRamp;
@@ -307,7 +309,8 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		/*
 		* Initializes variables and EditBoxes related to "RAMP" GroupBox
 		*/
-		void						InitLoopSM();
+		//void						InitLoopSM();
+		void						InitRampGB();
 
 		/*
 		* A Finite state machine switch() function. It controls RAMP motion (initial, upper, lower, upper, lower, ...)
@@ -324,13 +327,12 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		void						ExecuteRampMotionControl();//RAMP mode
 		//void						setLoopInitialValue();
 
-		/*
-		* 		Takes a value from and edit box and sets its associated variable
-		*		It is able to read on different units selection
-		*		It multiplies internal value by gear factor
+		/*		Takes a value from an edit box (POSITION variables only!) and sets its associated variable in [encoder counts] units
+		*		It is able to read on different units selection and do their conversion
+		*		It multiplies internal value by gear factor, so GUI works with Module but control works with 
 		*
 		*		@param	id_editbox		EditBox Numerical ID
-		*		@param	var				Pointer to the variable to be written
+		*		@param	var				Pointer to the variable to be written (POSITION variables only!)
 		*/
 		void						SetLoopValue(int id_editbox, float * var);
 
@@ -340,12 +342,14 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//////////////////////////////////////////////////////////////////////////////////
 
 		bool						velRunning;
-		int							velTargetRPM;// Velocity Target in [rpm]
-		double						velTargetVel;// Velocity Target in [rev/s] - MOTOR INPUT
-		double						velTargetAcc;
+		int							velTargetRPM;// Velocity Target in [rpm]	- Motor (inner)
+		double						velTargetVel;// Velocity Target in [rev/s]	- Motor (inner)
+		double						velTargetAcc;// Velocity Target in [rev/s^2]- Motor (inner)
+		int							velTargetAccRPM;	// 'Profile Velocity' mode Acceleration in [rpm]
 
-		int							velTargetVelValue; // Velocity Target in [rpm] with and offset of 7500
-		int							velTargetAccValue;
+		int							velTargetVelValue;	// 'Profile Velocity' mode Velocity in [rpm] with an offset of 7500
+		int							velTargetAccValue;	// 'Profile Velocity' mode Acceleration in [rpm]
+
 
 		void						InitVelMotion();
 		void						UpdateVelMotionValues();
@@ -407,6 +411,14 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		*/
 		void InitLog();
 
+		/*Does units conversion in Ramp GroupBox EditBoxes 
+		*(internal variables are updated by other functions that read those editboxes)
+		* @param oldUnits	An integer value of old units selection
+		* @param newUnits	An integer value of new units selection
+		* @param val		A double pointer to a field (editbox) value
+		*/
+		void CRSSMotorCtrlDlg::convertUnits(int oldUnits, int newUnits, double *val);
+
 		//Sliders
 		afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);		
 		CSliderCtrl scVelocity;	// Velocity slider inside Velocity Motion group							
@@ -418,10 +430,11 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		*/
 		afx_msg void OnBnClickedButtonRecData();
 
+		//Combo Boxes
+		afx_msg void LoadComboBox();
 		// Units selection in "Ramp motion - Upper Position" field
 		CComboBox cmbRampUpUnitsSel;
 		afx_msg void OnCbnSelchangeComboRampUpUnits();
-		afx_msg void LoadComboBox();
 		enum cmbUnits {	DEGREES, COUNTS, RADIANS };
 		// Control for 'Select Slave' ComboBox (Advanced)
 		CComboBox cmbSlaveSel;
@@ -455,5 +468,4 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int64_t ThermalAnalysisTimePrev;	//TTAG of previous Temperature recording [seconds]
 		int64_t ThermalAnalysisFreq;		//Frequency (clock) value for Thermal analysis [Hz?]
 		void CheckThermalAnalysis(void);
-
 };

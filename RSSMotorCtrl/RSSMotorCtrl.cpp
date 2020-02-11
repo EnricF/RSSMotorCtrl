@@ -22,9 +22,7 @@
 #endif
 
 
-
 // CRSSMotorCtrlApp
-
 BEGIN_MESSAGE_MAP(CRSSMotorCtrlApp, CWinApp)
 	ON_COMMAND(ID_HELP, &CWinApp::OnHelp)
 END_MESSAGE_MAP()
@@ -85,15 +83,20 @@ BOOL CRSSMotorCtrlApp::InitInstance()
 	CRSSMotorCtrlDlg dlg;
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
+
 	if (nResponse == IDOK)
 	{
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with OK
+		PLOGI << "App: OK";
+		Sleep(1000);
 	}
 	else if (nResponse == IDCANCEL)
 	{
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with Cancel
+		PLOGI << "App: CANCEL";
+		Sleep(1000);
 	}
 	else if (nResponse == -1)
 	{
@@ -113,6 +116,7 @@ BOOL CRSSMotorCtrlApp::InitInstance()
 
 	// Since the dialog has been closed, return FALSE so that we exit the
 	//  application, rather than start the application's message pump.
+	Sleep(1000);
 	return FALSE;
 }
 

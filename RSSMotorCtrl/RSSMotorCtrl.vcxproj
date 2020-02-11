@@ -98,7 +98,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Program Files\esd\EtherCAT\Master\include;C:\Users\Enric Fernandez\Downloads\plog-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\esd\EtherCAT\Master\include;C:\Users\Enric Fernandez\Downloads\plog-master\include;</AdditionalIncludeDirectories>
       <LanguageStandard>
       </LanguageStandard>
       <CompileAs>CompileAsCpp</CompileAs>
@@ -127,7 +127,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Users\Enric Fernandez\Downloads\plog-master\include;C:\Program Files\esd\EtherCAT\Master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Enric Fernandez\Downloads\plog-master\include;C:\Program Files\esd\EtherCAT\Master\include;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
