@@ -74,10 +74,33 @@ class CecmW {
 		char PrimaryNIC[64];	//For external access
 		char SecondaryNIC[64];	//For external access
 
-		std::map<uint32_t, CString> errorCodesMap;//Struct will be loaded into map for easier search later
-		//std::map<CString, uint32_t> errorCodesMap2;//Struct will be loaded into map for easier search later
+		PDMapP slavePD[2];		//An array that contains all pointers to PD variables of all Slaves
 
-		PDMapP slavePD[2];//An array that contains all pointers to PD variables
+		std::map<uint32_t, CString> errorCodesMap;//Error-codes Struct will be loaded into map for easier search later		
+
+
+		//----------------
+		//MOTION variables
+		//----------------
+		//int			decimator				= 0;//a decimator of GUI loops, so ProcessData (EtherCAT) is updated at lower rate than GUI
+		//Profile Position (Ramp) mode control variables
+		const int	numCommandsProfilePos = 7;
+		int			iCommandProfilePos;//iterator of actual command in Profile Position mode
+		const int	iNextItProfilePos = 3;//Index for next command
+		//Profile Velocity mode control variables
+		const int	numCommandsProfileVel = 7;
+		int			iCommandProfileVel;//iterator of actual command in Profile Velocity mode
+		const int	iNextItProfileVel = 3;//Index for next command
+		//Velocity mode control variables
+		//const int	numCommandsVel;
+		//int			iCommandVel;//iterator of actual command in Profile Velocity mode
+		
+		//Commands matrixes --> to be declared here
+		//commandsMatrix ProfilePosMatrix[numCommandsProfilePos];
+		//commandsMatrix ProfileVelMatrix[numCommandsProfileVel];
+
+		//Little-Endian buffer
+		uint8_t LEbuffer[4] = { 0,0,0,0 };//To keep LittleEndian bytes, temporal
 
 	private:
 		char PrimaryNICNameDefault[64]	= "TwinCAT Gigabit Primary Adapter";//Now is fixed, TODO: read/load from NIC adapters array
@@ -257,7 +280,7 @@ class CecmW {
 		* Set a Target Velocity to the drive
 		* @param	fLoopMaxVel	Velocity in [units?]
 		*/
-		//void		SetTargetVel(float fVel);//old?
+		//void		SetTargetVel(float fVel);//old
 
 
 };

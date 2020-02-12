@@ -524,22 +524,7 @@ static uint8_t *pucDio_CurrentA				= NULL;//"Current A" pointer					(Axis1)
 static uint8_t *pucDio_CurrentB				= NULL;//"Current B" pointer					(Axis1)
 static uint8_t *pucDio_CurrentC				= NULL;//"Current C" pointer					(Axis1)
 
-//----------------
-//MOTION variables
-//----------------
-int			decimator				= 0;//a decimator of GUI loops, so ProcessData (EtherCAT) is updated at lower rate than GUI
-//Profile Position (Ramp) mode control variables
-const int	numCommandsProfilePos	= 7;
-int			iCommandProfilePos		= 0;//iterator of actual command in Profile Position mode
-//Velocity mode control variables
-const int	numCommandsVel			= 7;
-int			iCommandVel				= 0;//iterator of actual command in Profile Velocity mode
-//Profile Velocity mode control variables
-const int	numCommandsProfileVel	= 7;
-int			iCommandProfileVel		= 0;//iterator of actual command in Profile Velocity mode
 
-//Little-Endian buffer
-uint8_t LEbuffer[4] = { 0,0,0,0 };//To keep LittleEndian bytes, temporal
 //address (PDO) | value
 typedef struct commandsMatrix {
 	uint8_t *PDOpointer;
@@ -3454,6 +3439,18 @@ extern "C" void EXPORT SetLog(plog::Severity severity, plog::IAppender* appender
 
 CecmW::CecmW() {	
 	PLOG_NONE << "ECM object created";//It is not written but is not important
+
+	//Profiler Position
+	//numCommandsProfilePos	= 7;
+	iCommandProfilePos		= 0;//iterator of actual command in Profile Position mode
+	//iNextItProfilePos		= 3;//Index for next command
+	//Profile Velocity mode control variables
+	//numCommandsProfileVel	= 7;
+	iCommandProfileVel		= 0;//iterator of actual command in Profile Velocity mode
+	//iNextItProfileVel		= 3;//Index for next command
+	//Velocity mode control variables - OLD
+	//numCommandsVel			= 7;
+	//iCommandVel				= 0;//iterator of actual command in Profile Velocity mode
 }
 
 CecmW::~CecmW() {
@@ -4069,8 +4066,9 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 		uint8_t			linkLost = 0;	//New EXIT condition
 		ECM_SLAVE_DIAG	diag;		//To know about EtherCAT link status
 		for (i = 0; ; i++) {
+#ifdef _CONSOLE
 			uint16_t	usData;
-
+#endif
 			// Check exit condition
 			if ( (g_lRuntime != 0) && i >= (int)g_lRuntime ) {
 				break;
@@ -4086,8 +4084,8 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 				break;
 			}
 
-			if (!is_running) {
-				PLOGI << "ThreadIActive = false";
+			if (!*is_running) {
+				PLOGI << "ThreadECMActive = false --> Break condition in ECM loop!";
 				break;
 			}
 
@@ -4179,8 +4177,8 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 
 		//PrintStatistic(hndDevice, hndMaster);
 
-	} while ( (--g_lLoops > 0) );
-	//} while ( *is_running == true );
+	//} while ( (--g_lLoops > 0) );
+	} while ( *is_running );
 
 	PLOG_INFO << "Detaching master...";
 #ifdef _CONSOLE
@@ -4261,8 +4259,10 @@ int CecmW::Init(int argc, char *argv[], bool *is_running)
 */
 
 //Commands matrixes --> VALIDATED
-commandsMatrix ProfilePosMatrix[numCommandsProfilePos];
-commandsMatrix ProfileVelMatrix[numCommandsProfileVel];
+//commandsMatrix ProfilePosMatrix[numCommandsProfilePos];
+//commandsMatrix ProfileVelMatrix[numCommandsProfileVel];
+commandsMatrix ProfilePosMatrix[7];
+commandsMatrix ProfileVelMatrix[7];
 
 void CecmW::fillProfilePosMatrix(int selSlave) {
 
@@ -4368,6 +4368,7 @@ bool CecmW::MotionFProfileVelMode(float fProfileVel_rev_s, int selSlave) {
 
 }
 
+/*
 bool CecmW::MotionFVelMode(int iTargetVel_inc_s) {//OLD
 	//Commands matrix
 	static commandsMatrix VelMatrix[numCommandsVel] = {
@@ -4405,7 +4406,7 @@ bool CecmW::MotionFVelMode(int iTargetVel_inc_s) {//OLD
 		iCommandVel = 4;//Not at start anymore
 		return true;//END
 	}
-}
+}*/
 
 void CecmW::StatusFaultReset(int selSlave) {
 	*slavePD[selSlave].pDio_ControlWordAxis1 = CTRLW_FAULT_RST;//0x80

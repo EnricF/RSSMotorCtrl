@@ -148,48 +148,16 @@ UINT ThreadInterface(LPVOID pParam)
 		//Update Interface Control values
 		pObject->UpdateInterfaceControls();
 	}
-
-	WaitForSingleObject(pObject->tECMWorker, INFINITE);//Waits for Worker thread to finish	
+	DWORD dwRet;
+	dwRet = WaitForSingleObject(pObject->tECMWorker->m_hThread, 1000);//Waits for Worker thread to finish or timeout
+	PLOGI << "WaitForSingleObject ret = " << dwRet;
 	
 	//Finish Thread
 	pObject->bThreadRIFinished = true;
+	Sleep(100);//WaitForsingleObject is not working as expected
 	
+	PLOGI << " ThreadRI finished!";
 	return 0;
-}
-
-
-//EtherCAT thread
-UINT ThreadECMWorker(LPVOID pParam) {
-	__int64 initial, final;
-
-	CRSSMotorCtrlDlg* pObject = (CRSSMotorCtrlDlg*)pParam;
-
-	pObject->bThreadECMWActive = true;
-
-	//Control bucle
-	while (pObject->bThreadECMWActive || pObject->bThreadWActive)
-	{
-		//Init ECM and loop until end
-
-		pObject->cecmW.Init(__argc, __argv, &pObject->bThreadWActive);//Receives main WORKER thread status (active TRUE or FALSE)
-				
-		//Initialize time counters
-		QueryPerformanceCounter((LARGE_INTEGER*)&final);
-
-		//Initialize time counters
-		QueryPerformanceCounter((LARGE_INTEGER*)&initial);
-
-		//Reconnect (loop)
-		if(pObject->bThreadECMWActive){
-			PLOGI << " ThreadECM thread might be restarted";
-			/*if(pObject->cecmW.GetStatus() != 0)//Destroy it only if stills alive
-				pObject->cecmW.~CecmW();*/
-		}
-	}
-	//Finish Thread
-	pObject->bThreadECMWFinished = true;
-
-	return 0;//OK
 }
 
 //Control thread
@@ -263,15 +231,73 @@ UINT ThreadWorker(LPVOID pParam)
 		//Wait Exact Time Fixed 25ms
 		while ((final - initial)*1000.0 / pObject->iFrequency < 10) QueryPerformanceCounter((LARGE_INTEGER*)&final);
 	}
+	
+	DWORD dwRet;
+	dwRet = WaitForSingleObject(pObject->tECMWorker->m_hThread, 1000);//Waits for ECM thread to finish	
+	PLOGI << "WaitForSingleObject ret = " << dwRet;
+	
+#ifdef _DEBUG
+	switch (dwRet)
+	{
+		case WAIT_ABANDONED:
+			PLOGD << "Object was not released by the thread";
+			break;
 
-	WaitForSingleObject(pObject->tECMWorker, INFINITE);//Waits for ECM thread to finish	
+		case WAIT_OBJECT_0:
+			PLOGD << "The child thread state was signaled!";
+			break;
 
+		case WAIT_TIMEOUT:
+			PLOGD << "Time - out interval elapsed, and the child thread's state is nonsignaled";
+			break;
+
+		case WAIT_FAILED:
+			PLOGD << "WaitForSingleObject() failed, error " << GetLastError();
+			//ExitProcess(0);
+	}
+#endif
 	//Finish Thread
 	pObject->bThreadWFinished = true;
-	   
-	Sleep(1000);
+	Sleep(100);//WaitForsingleObject is not working as expected
 
+	PLOGI << " ThreadW finished!";
 	return 0;
+}
+
+//EtherCAT thread
+UINT ThreadECMWorker(LPVOID pParam) {
+	__int64 initial, final;
+
+	CRSSMotorCtrlDlg* pObject = (CRSSMotorCtrlDlg*)pParam;
+
+	pObject->bThreadECMWActive = true;
+
+	//Control bucle
+	//while (pObject->bThreadECMWActive || pObject->bThreadWActive)
+	while (pObject->bThreadECMWActive)
+	{
+		//Init ECM and loop until end
+
+		pObject->cecmW.Init(__argc, __argv, &pObject->bThreadECMWActive);//Receives main WORKER thread status (active TRUE or FALSE)
+
+		//Initialize time counters
+		QueryPerformanceCounter((LARGE_INTEGER*)&final);
+
+		//Initialize time counters
+		QueryPerformanceCounter((LARGE_INTEGER*)&initial);
+
+		//Reconnect (loop)
+		if (pObject->bThreadECMWActive) {
+			PLOGI << " ThreadECM thread might be restarted";
+			/*if(pObject->cecmW.GetStatus() != 0)//Destroy it only if stills alive
+				pObject->cecmW.~CecmW();*/
+		}
+	}
+	//Finish Thread
+	pObject->bThreadECMWFinished = true;
+
+	PLOGI << " ThreadECM finished!";
+	return 0;//OK
 }
 
 // CRSSMotorCtrlDlg message handlers
@@ -310,7 +336,7 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
-	SetIcon(m_hIcon, TRUE);			// Set big icon
+	//SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	//Start LOG objects
@@ -328,8 +354,8 @@ BOOL CRSSMotorCtrlDlg::OnInitDialog()
 	//Init Threads
 	InitControlThreads();//EF mod : new thread to Init() EtherCAT communication
 	
-	//Init Home Position - To be Moved (user button)
-	//InitHomeModulePos();
+	//Init Home Position
+	SetHomeModulePos();
 
 	//Init calibration correction 
 	//InitCalibPosition();
@@ -421,32 +447,33 @@ void CRSSMotorCtrlDlg::InitControlThreads()
 	//Create and run ECM thread
 	tECMWorker	= AfxBeginThread(ThreadECMWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
 	
-	//Create and run control thread
+	//Create and run Control thread
 	tWorker		= AfxBeginThread(ThreadWorker, this, THREAD_PRIORITY_TIME_CRITICAL);
 
-	//Create and run interface thread
+	//Create and run Interface thread
 	tRefreshInterface = AfxBeginThread(ThreadInterface, this, THREAD_PRIORITY_NORMAL);
 }
 
 void CRSSMotorCtrlDlg::FinalizeControlThreads()
 {
-
+	bThreadECMWActive	= false;
+	//Sleep(100);
 	bThreadWActive		= false;
 	bThreadRIActive		= false;
-	bThreadECMWActive	= false;
-	bThreadWSActive		= false;
+	//bThreadWSActive		= false;
 
 	//SetTimer(TIMER_EXIT, 5000, 0);
 	Sleep(1000);
 }
 
 //Homing
-void CRSSMotorCtrlDlg::InitHomeModulePos() {
-	while (cecmW.GetStatus(slaveActive) == 0) {
-		//May still here forever
-	};
-	homeModulePos_enc = (int)cecmW.GetModuleActPos(slaveActive);			//Save it
-	PLOGI << "Module Home Position = " << homeModulePos_enc;
+void CRSSMotorCtrlDlg::SetHomeModulePos() {
+
+	if (cecmW.GetStatus(slaveActive) != 0) {
+		homeModulePos_enc = (int)cecmW.GetActPos(slaveActive);//Save it - Option1
+		//homeModulePos_enc = (int)cecmW.GetModuleActPos(slaveActive);//Save it - Option2
+		PLOGI << "Module Home Position = " << homeModulePos_enc << "[enc]";
+	}
 }
 
 
@@ -633,22 +660,25 @@ void CRSSMotorCtrlDlg::InitDevData()
 	picStatusSemaphore.LoadBitmapA("res\\StatusSemaphoreYellow.bmp");
 }
 
-void CRSSMotorCtrlDlg::SetLoopValue(int id_editbox, float * var) {
+void CRSSMotorCtrlDlg::SetLoopValue(int id_editbox, float * var)
+{
 	CString szText;
 
 	GetDlgItemText(id_editbox, szText);
 
 	if (cmbRampUpUnitsSel.GetCurSel() == DEGREES) {//DEGREES
-		*var = (float)(atof(szText)*ENC_MOTOR_DR*gearFactor/360.);			//[encoder counts] - Motor(inner)
+		*var = (float)(atof(szText)*ENC_MOTOR_DR*gearFactor / 360.);			//[encoder counts] - Motor(inner)
+		*var = homeModulePos_enc + *var;
+		//*var = (float)( (atof(szText)-(homeModulePos_enc/ENC_MODULE_DR)*360.) *ENC_MOTOR_DR*gearFactor/360.);			//[encoder counts] - Motor(inner)
 	}
 	else if (cmbRampUpUnitsSel.GetCurSel() == COUNTS) {//COUNTS
-		*var = (float)(atof(szText)*ENC_MOTOR_DR*gearFactor/ENC_MODULE_DR);	//[encoder counts] - Motor(inner)
+		*var = (float)( atof(szText)*ENC_MOTOR_DR*gearFactor/ENC_MODULE_DR);	//[encoder counts] - Motor(inner)
 	}
 	else if (cmbRampUpUnitsSel.GetCurSel() == RADIANS) {//RADIANS 
-		*var = (float)(atof(szText)*ENC_MOTOR_DR*gearFactor / (2 * CV_PI)); //[encoder counts] - Motor(inner)
+		*var = (float)( atof(szText)*ENC_MOTOR_DR*gearFactor / (2 * CV_PI)); //[encoder counts] - Motor(inner)
 	}
-	else {//COUNTS by default (no more options yet)
-		*var = (float)(atof(szText)*gearFactor);							//[encoder counts] - Motor(inner)
+	else {//DEGREES by default (no more options yet)
+		*var = (float)((atof(szText) - (homeModulePos_enc / ENC_MODULE_DR)*360.) *ENC_MOTOR_DR*gearFactor / 360.);			//[encoder counts] - Motor(inner)
 	}
 }
 
@@ -887,6 +917,10 @@ void CRSSMotorCtrlDlg::GetDefaultDeviceParameters()
 }
 
 void CRSSMotorCtrlDlg::ExecuteCommands(){
+
+	if(homeModulePos_enc == 0)//Do it only once - to be move out of this loop
+		SetHomeModulePos();
+
 	//Set Module Zero Offset
 	//SetModuleZero();
 
@@ -2077,7 +2111,18 @@ void CRSSMotorCtrlDlg::OnBnClickedButtonDevBrake(){
 
 void CRSSMotorCtrlDlg::OnBnClickedCancel()
 {
+	bool isFinished = false;
 	PLOGI << "Click on 'Cancel/Close' button";
+
+	if (velTargetVel != 0.0) {
+		while (!isFinished) {//Set 0 velocity if needed
+			isFinished = cecmW.MotionFProfileVelMode(iLoopTargetPos_enc, slaveActive);//single drive condition
+		}
+		PLOGI << "Setting 0 [rev/s] velocity before shutdown";
+	}
+	// Power off motor? By now just set Operational state
+	cecmW.SetOperationalState(slaveActive);
+	PLOGI << "Drive is in Operational state - No Motion";
 
 	//New
 	FinalizeControlThreads();

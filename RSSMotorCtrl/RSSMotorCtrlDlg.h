@@ -4,21 +4,19 @@
 
 #pragma once
 
+//Other variables
+#include "globalVar.h"
+
 //EF mod: use only to pass compilation while code editing
 #ifndef CV_PI
 #define CV_PI 3.14159265359
 #endif
-
-//Other variables
-#include "globalVar.h"
-
 
 // CRSSMotorCtrlDlg dialog
 class CRSSMotorCtrlDlg : public CDialogEx
 {
 
 	public:
-		void						InitHomeModulePos(void);
 		//////////////////////////////////////////////////////////////////////////////////////
 		//									CONTROL THREADS									//
 		//////////////////////////////////////////////////////////////////////////////////////
@@ -29,31 +27,31 @@ class CRSSMotorCtrlDlg : public CDialogEx
 
 		//Variables
 		__int64						iFrequency;
-		int							iMTPC;
+		//int							iMTPC;
 
-		//Process
+		//Process - Control loop
 		bool						bThreadWActive;
 		bool						bThreadWFinished;
 		CWinThread *				tWorker;
 		double						dWorkerTPC;
 
-		//Secondary
-		bool						bThreadWSActive;
-		bool						bThreadWSFinished;
-		CWinThread *				tSecWorker;
-		double						dSecWorkerTPC;
-
-		//ECM
+		//ECM - EtherCAT
 		bool						bThreadECMWActive;
 		bool						bThreadECMWFinished;
 		CWinThread *				tECMWorker;
 		double						dECMWorkerTPC;
 
-		//Interface
+		//Interface - Parameters Group Box
 		bool						bThreadRIActive;
 		bool						bThreadRIFinished;
 		CWinThread *				tRefreshInterface;
 		double						dRITPC;
+
+		//Secondary?
+		//bool						bThreadWSActive;
+		//bool						bThreadWSFinished;
+		//CWinThread *				tSecWorker;
+		//double						dSecWorkerTPC;
 
 		//Functions
 		void						InitControlThreads();
@@ -70,9 +68,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		//									2D Interface								//
 		//////////////////////////////////////////////////////////////////////////////////
 
-		void						UpdateTimings();
-		void						ShowTiming();
-		void						ClearTiming(int id);
+		//void						UpdateTimings();
+		//void						ShowTiming();
+		//void						ClearTiming(int id);
 		void						ShowParameter(int id);
 
 		//////////////////////////////////////////////////////////////////////////////////
@@ -112,9 +110,9 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						DEV_M_STOP		0
 		#define						DEV_M_POS		1
 		#define						DEV_M_VEL		2			
-		#define						DEV_M_ROTOR		3				
-		#define						DEV_M_PWM		4
-		#define						DEV_M_STEP		5
+		//#define						DEV_M_ROTOR		3				
+		//#define						DEV_M_PWM		4
+		//#define						DEV_M_STEP		5
 
 		//Real parameters - Motor model 400 - IN GLOBAL_VAR.H file
 		//#define						MOTOR_VEL_DR_REV_S	400	//Motor velocity dynamic range
@@ -269,7 +267,10 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		#define						LOOP_STATE_DELAY_FU			5
 		#define						LOOP_STATE_DELAY_FL			6
 
+		bool						bSendLoopCommand;
+		bool						bSendRamp;
 		bool						bLoopStart;
+		int							iDelayCounter;
 
 	//Position
 		//EDIT BOXES (GUI) - Unit conversion is done by SetLoopValue() function
@@ -292,19 +293,11 @@ class CRSSMotorCtrlDlg : public CDialogEx
 	//LOOP CONTROL: INTEGER VALUES (EtherCAT) --> Drive&Motor!
 		int							iLoopTargetPos_enc;			//EtherCAT: [encoder counts] - Motor(inner)
 		int							iLoopActPos_enc;			//EtherCAT: [encoder counts] - Motor(inner
-	//Margin
+	//Position error margin
 		#define						LOOP_MIN_ERROR_ENC			512 //[encoder counts] - Motor(inner)
 
 		//¿¿¿¿¿?????
-		int							iLoopTargetPosLast;//What is this?
-
-		
-
-		bool						bSendLoopCommand;
-
-		bool						bSendRamp;
-
-		int							iDelayCounter;
+		//int							iLoopTargetPosLast;//What is this?
 
 		/*
 		* Initializes variables and EditBoxes related to "RAMP" GroupBox
@@ -330,12 +323,19 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		/*		Takes a value from an edit box (POSITION variables only!) and sets its associated variable in [encoder counts] units
 		*		It is able to read on different units selection and do their conversion
 		*		It multiplies internal value by gear factor, so GUI works with Module but control works with 
+		*		It may use motor HOME coordinates to work with relative motor coordinates
 		*
 		*		@param	id_editbox		EditBox Numerical ID
 		*		@param	var				Pointer to the variable to be written (POSITION variables only!)
 		*/
 		void						SetLoopValue(int id_editbox, float * var);
 
+		/*Basic version of HOMING. Update is pending (design/operation)
+		* Saves once motor encoder position only if EtherCAT comms are available
+		* After that, every Ramp Motion position command will be relative to motor HOME position
+		* Newer versions may change this procedure
+		*/
+		void						SetHomeModulePos(void);
 
 		//////////////////////////////////////////////////////////////////////////////////
 		//							     VELOCITY CONTROL								//
@@ -350,18 +350,24 @@ class CRSSMotorCtrlDlg : public CDialogEx
 		int							velTargetVelValue;	// 'Profile Velocity' mode Velocity in [rpm] with an offset of 7500
 		int							velTargetAccValue;	// 'Profile Velocity' mode Acceleration in [rpm]
 
-
-		void						InitVelMotion();
+		//void						InitVelMotion();
 		void						UpdateVelMotionValues();
 		void						ExecuteVelMotionControl();//VEL mode
 		void						UpdateVelMotionInterface();
 
-		/*
-		*	Gets Profiler limits from User (RAMP group box) and configures drive profiler
+		/*Basic version of HOMING only for Velocity control as SUMMIT specifies. To be done!
 		*/
-		void						UpdateProfilerLimits();
+		//void						SetHomingVel(void);
 
+		//////////////////////////////////////////////////////////////////////////////////
+		//									PROFILER									//
+		//////////////////////////////////////////////////////////////////////////////////
 
+		/*
+		*	Gets Profiler limits from User/GUI (RAMP group box) and configures drive Profiler properly
+		*	Set Profiler Max. Velocity, Macx. Acceleration and Max. Deceleration
+		*/
+		void						UpdateProfilerLimits();		
 
 		//////////////////////////////////////////////////////////////////////////////////
 		//									COMMANDS									//
